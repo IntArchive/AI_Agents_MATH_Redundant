@@ -1,0 +1,4 @@
+deepseek_api: "sk-11efea697f564cff8c16d9cfbd1ae4ce"
+gemini_api: "AIzaSyA6f5Q70ZDDI568Ty9cEf87CLLhtyzydUY"
+file_path: "C:/Users/haidm18/Documents/My_git/ma_IMO/working/data/result_task_all.xlsx"
+target_problem_col: "Problem_with_redundant_assumption"

@@ -1,0 +1,4 @@
+{
+    "input": "user: Assumption:\nAssumption 1: $G/Z(G)$ is cyclic.\nAssumption 2: $g=x^mz$\nProblem: \nProve that $G$ is abelian.",
+    "output": "```json\n{\n \"answer_to_Q1\": \"Yes\",\n \"assumptions\": [\n  \"$G/Z(G)$ is cyclic.\"\n ],\n \"redundant_assumption\": \"There exists an element x in G such that for every g in G, there exists an integer m and an element z in Z(G) such that g = x^m z.\"\n}\n```"
+}
