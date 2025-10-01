@@ -296,8 +296,7 @@ def main():
             os.mkdir(Path("./Problem_WOUT_RA"))
         with open(Path(f"./Problem_WOUT_RA/result_task_{i}.json"), "w", encoding="utf-8") as f_json:
             f_json.write(row_json)
-        # data.to_excel("result.xlsx", index=False)
-        # print("\n=== final answer ===\n" + final_answer)
+
 
 
 if __name__ == "__main__":
