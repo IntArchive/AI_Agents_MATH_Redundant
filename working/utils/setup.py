@@ -1,8 +1,9 @@
 from omegaconf import OmegaConf
+from pathlib import Path
 import os
 
 def setup():
-    config = OmegaConf.load('.\\config.yml')
+    config = OmegaConf.load(Path('./config.yml'))
     if not os.environ.get("DEEPSEEK_API_KEY"):
         os.environ["DEEPSEEK_API_KEY"] = config.deepseek_api
     

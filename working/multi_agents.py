@@ -2,6 +2,7 @@
 # Run: python multi_agents.py "Build a quick Fibonacci function and verify f(10)=55"
 
 from typing import List, Dict, Any, Union, Optional
+from pathlib import Path
 import os
 import sys
 from dataclasses import dataclass
@@ -289,7 +290,11 @@ def main():
             data.at[i, "Redundant_assumption"] = redundant_assumption
         # Save the current row as JSON for inspection
         row_json = data.iloc[i].to_json(force_ascii=False, indent=4)
-        with open(f"./Problem_WOUT_RA/result_task_{i}.json", "w", encoding="utf-8") as f_json:
+        if os.path.lexists(Path("./Problem_WOUT_RA")):
+            pass
+        else:
+            os.mkdir(Path("./Problem_WOUT_RA"))
+        with open(Path(f"./Problem_WOUT_RA/result_task_{i}.json"), "w", encoding="utf-8") as f_json:
             f_json.write(row_json)
         # data.to_excel("result.xlsx", index=False)
         # print("\n=== final answer ===\n" + final_answer)
