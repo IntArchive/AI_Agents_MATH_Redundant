@@ -1,6 +1,7 @@
 # Python-generated files
 __pycache__/
 working/asset/
+working/*test*
 *.py[oc]
 build/
 dist/
