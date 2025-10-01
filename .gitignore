@@ -1,7 +1,7 @@
 # Python-generated files
 __pycache__/
 working/asset/
-working/*test*
+working/test.ipynb
 *.py[oc]
 build/
 dist/
