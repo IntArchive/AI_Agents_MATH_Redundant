@@ -204,6 +204,14 @@ def main():
         # other params...
     )
 
+    llm_gemini_2 = ChatGoogleGenerativeAI( 
+        model="gemini-2.5-pro", 
+        temperature=0,
+        max_tokens=None,
+        timeout=None,
+        max_retries=2,
+        # other params...
+    )
 
     parser1 = PydanticOutputParser(pydantic_object=JudgeOutput )    
     parser2 = PydanticOutputParser(pydantic_object=PlannerOutput)
@@ -215,11 +223,12 @@ def main():
         goal="""
     Read a structured mathematics problem. 
     Answer the question Q1: 'Does it problem have a redundant assumption?'
-    If it has, create a new problem that we can deduce the redundant assumption from the other assumptions.""",
+    
+    """,
         guidelines=(
             "Guideline_1: Answer the question Q1 using the format 'answer_to_Q1'. "
-            "Guideline_2: If there is a redundant assumption, output your answer as a JSON object with keys: 'answer_to_Q1', 'assumptions' and 'redundant_assumption'. "
-            "Guideline_3: If there is not a redundant assumption, output JSON with 'answer_to_Q1' and 'redundant_assumption: no'. "
+            "Guideline_2: If there is a redundant assumption, output your answer as a JSON object with keys: 'answer_to_Q1', 'assumptions', 'redundant_assumption' and 'new_problem'. "
+            "Guideline_3: If there is not a redundant assumption, output JSON with 'answer_to_Q1', 'redundant_assumption: no' and 'new_problem: no'. "
             "Guideline_4: Store the plan via save_note, then hand off succinctly. "
             + parser1.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
         ),
