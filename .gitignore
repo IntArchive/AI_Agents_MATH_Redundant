@@ -2,6 +2,7 @@
 __pycache__/
 working/asset/
 working/test.ipynb
+working/temp.ipynb
 *.py[oc]
 build/
 dist/
