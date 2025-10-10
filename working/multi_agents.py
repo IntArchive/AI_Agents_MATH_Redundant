@@ -32,7 +32,7 @@ import json
 
 # 1. Define the schema
 class JudgeOutput(BaseModel):
-    answer_to_Q1: str
+    answer_to_Q1: str = ""
     assumptions: Optional[List[str]] = None
     redundant_assumption: Optional[str] = None
     new_problem: Optional[str] = None
@@ -153,7 +153,7 @@ class MultiAgentSystem:
                         # Build a clear handoff message for the reviewer including the new problem and its solution
                         handoff_lines = []
                         handoff_lines.append(f"Answer to Q1: {parsed.answer_to_Q1}")
-                        print("co redundant assumption:", parsed.redundant_assumption)
+                        print("co redundant assumption? Answer: ", parsed.redundant_assumption)
                         if parsed.redundant_assumption:
                             filtered_assumptions = [a for a in (parsed.assumptions or []) if a != parsed.redundant_assumption]
                             filtered_assumptions = [
@@ -238,7 +238,7 @@ def main():
     # define three agents with different responsibilities
     # 3. Add parser instructions to your guidelines or prompt
     judge = build_agent(
-        llm=llm_gemini,
+        llm=llm_deepseek,
         name="judge",
         goal="""
     Read a structured mathematics problem. 
