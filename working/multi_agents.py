@@ -197,6 +197,7 @@ class MultiAgentSystem:
 
 def main():    
     config = setup.setup()
+    save_path = config.save_path
     data = pd.read_excel(config.file_path)
     data["judge"] = ""
     data["proof strategy planner"] = ""
@@ -305,7 +306,7 @@ def main():
         max_rounds=6,
     )
 
-    for i in range(0, 60, 1):
+    for i in range(43, 50, 1):
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n" + task)
         final_answer = system.run(task)
@@ -319,11 +320,15 @@ def main():
             data.at[i, "Redundant_assumption"] = redundant_assumption
         # Save the current row as JSON for inspection
         row_json = data.iloc[i].to_json(force_ascii=False, indent=4)
-        if os.path.lexists(Path("./Problem_WOUT_RA")):
+
+
+
+        
+        if os.path.lexists(Path(save_path)):
             pass
         else:
-            os.mkdir(Path("./Problem_WOUT_RA"))
-        with open(Path(f"./Problem_WOUT_RA/result_task_{i}.json"), "w", encoding="utf-8") as f_json:
+            os.mkdir(Path(save_path))
+        with open(Path(f"{save_path}/result_task_{i}.json"), "w", encoding="utf-8") as f_json:
             f_json.write(row_json)
 
 
