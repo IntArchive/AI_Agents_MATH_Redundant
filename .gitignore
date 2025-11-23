@@ -1,9 +1,7 @@
 # Python-generated files
 __pycache__/
-working/asset/
-working/test.ipynb
-working/temp.ipynb
 *.py[oc]
+working/asset/
 build/
 dist/
 wheels/
@@ -15,5 +13,6 @@ wheels/
 # log
 *.log
 
-uv.lock
-working/config.yml
+config.yml
+
+working/asset/
