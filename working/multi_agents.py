@@ -192,6 +192,9 @@ class MultiAgentSystem:
 
                 # keep passing along the latest output
                 running_input = output
+                print("="*100)
+                print("running_input: ", running_input)
+                print("="*100)
         # if nobody concluded with final:
         return "no agent produced a final answer within the round limit."
 
