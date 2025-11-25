@@ -1,19 +1,31 @@
+from src.agents.final_reviewer import FinalReviewerAgent
+from src.agents.judge import JudgeAgent
 from src.schemas.messages import Task
+from src.tools.proof_checker import ProofCheckerTool
 from src.workflows.orchestrator import Orchestrator, Role
 
 
-class DummyAgent:
-    def __init__(self, name: str):
-        self.name = name
+def test_orchestrator_stops_on_final(tmp_path):
+    judge_prompt = tmp_path / "judge.md"
+    reviewer_prompt = tmp_path / "reviewer.md"
+    judge_prompt.write_text("judge prompt", encoding="utf-8")
+    reviewer_prompt.write_text("reviewer prompt", encoding="utf-8")
 
-    def step(self, state):
-        from src.schemas.messages import Message
-
-        return Message(speaker=self.name, content="final: done")
-
-
-def test_orchestrator_stops_on_final():
-    orchestrator = Orchestrator(roles=[Role("judge", DummyAgent("judge"))], max_rounds=2)
-    outputs = orchestrator.run(Task(id="1", description="Test"))
-    assert "judge" in outputs
+    orchestrator = Orchestrator(
+        roles=[
+            Role("judge", JudgeAgent(prompt_path=str(judge_prompt))),
+            Role(
+                "final reviewer",
+                FinalReviewerAgent(
+                    prompt_path=str(reviewer_prompt),
+                    proof_checker=ProofCheckerTool(),
+                ),
+            ),
+        ],
+        max_rounds=4,
+    )
+    description = "Assumption 1: redundant angle.\nConclude?"
+    outputs = orchestrator.run(Task(id="1", description=description))
+    assert "final reviewer" in outputs
+    assert "final:" in outputs["final reviewer"]
 

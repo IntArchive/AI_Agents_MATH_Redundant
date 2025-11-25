@@ -3,22 +3,26 @@ from __future__ import annotations
 import argparse
 import uuid
 
+from src.agents.final_reviewer import FinalReviewerAgent
+from src.agents.judge import JudgeAgent
 from src.schemas.messages import Task
+from src.telemetry.logging import setup_logging
+from src.tools.proof_checker import ProofCheckerTool
 from src.utils.settings import load_config
 from src.workflows.orchestrator import Orchestrator, Role
 
 
 def build_agents(config):
-    # Placeholder: hook up actual agent implementations later.
-    from src.agents.base import Agent
-
-    class EchoAgent(Agent):
-        def step(self, state):
-            return state.memory[-1]
-
+    judge_prompt = config.agents["judge"].prompt_path
+    reviewer_prompt = config.agents["final_reviewer"].prompt_path
+    judge = JudgeAgent(prompt_path=judge_prompt)
+    reviewer = FinalReviewerAgent(
+        prompt_path=reviewer_prompt,
+        proof_checker=ProofCheckerTool(),
+    )
     return [
-        Role(name="judge", agent=EchoAgent("judge")),
-        Role(name="final reviewer", agent=EchoAgent("final reviewer")),
+        Role(name="judge", agent=judge),
+        Role(name="final reviewer", agent=reviewer),
     ]
 
 
@@ -29,6 +33,7 @@ def main() -> None:
     args = parser.parse_args()
 
     config = load_config(args.env)
+    setup_logging(config.logging.level)
     orchestrator = Orchestrator(roles=build_agents(config), max_rounds=config.workflow.max_rounds)
     task = Task(id=str(uuid.uuid4()), description=args.task)
     outputs = orchestrator.run(task)

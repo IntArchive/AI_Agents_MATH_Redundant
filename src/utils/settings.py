@@ -21,10 +21,15 @@ class WorkflowConfig(BaseModel):
     max_rounds: int
 
 
+class LoggingConfig(BaseModel):
+    level: str
+
+
 class AppConfig(BaseModel):
     llm: LLMConfig
     agents: Dict[str, AgentPromptConfig]
     workflow: WorkflowConfig
+    logging: LoggingConfig
 
 
 def load_config(env: str = "base") -> AppConfig:
@@ -37,6 +42,7 @@ def load_config(env: str = "base") -> AppConfig:
         llm=LLMConfig(**base["llm"]),
         agents={k: AgentPromptConfig(**v) for k, v in base.get("agents", {}).items()},
         workflow=WorkflowConfig(**base["workflow"]),
+        logging=LoggingConfig(**base.get("logging", {"level": "INFO"})),
     )
 
 
