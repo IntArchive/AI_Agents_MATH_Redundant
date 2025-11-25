@@ -1,0 +1,12 @@
+llm:
+  provider: deepseek
+  model: deepseek-chat
+  temperature: 0.0
+agents:
+  judge:
+    prompt_path: configs/prompts/judge.md
+  final_reviewer:
+    prompt_path: configs/prompts/final_reviewer.md
+workflow:
+  max_rounds: 6
+

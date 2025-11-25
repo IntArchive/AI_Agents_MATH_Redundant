@@ -1,0 +1,14 @@
+llm:
+  provider: openai
+  model: gpt-4.1-mini
+  temperature: 0.2
+agents:
+  judge:
+    prompt_path: configs/prompts/judge.md
+  final_reviewer:
+    prompt_path: configs/prompts/final_reviewer.md
+workflow:
+  max_rounds: 4
+logging:
+  level: INFO
+
