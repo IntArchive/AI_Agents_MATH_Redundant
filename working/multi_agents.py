@@ -190,11 +190,6 @@ class MultiAgentSystem:
                 # Record the actual output from this role in the transcript
                 self.transcript.append({"speaker": role.name, "text": output})
 
-                # stop condition
-                for line in output.splitlines():
-                    if line.strip().startswith("final:"):
-                        return process 
-
                 # keep passing along the latest output
                 running_input = output
 
@@ -205,11 +200,17 @@ class MultiAgentSystem:
                         "running_input": running_input,
                     }
                 )
-                with open("running_input.json", "a", encoding="utf-8") as f:
-                    json.dump(running_input_log, f, ensure_ascii=False, indent=4)
+
                 print("="*100)
                 print("running_input: ", running_input)
                 print("="*100)
+
+                # stop condition
+                for line in output.splitlines():
+                    if line.strip().startswith("final:"):
+                        with open("running_input.json", "a", encoding="utf-8") as f:
+                            json.dump({"round": round_idx, "role": role.name, "running_input": running_input}, f, ensure_ascii=False, indent=4)
+                        return process 
         # if nobody concluded with final:
         return "no agent produced a final answer within the round limit."
 
