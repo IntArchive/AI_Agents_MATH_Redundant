@@ -267,7 +267,7 @@ def main():
     """,
         guidelines=(
             "Guideline_1: Answer the question Q1 using the format 'answer_to_Q1'. "
-            "Guideline_2: If there is a redundant assumption, output your answer as a JSON object with keys: 'answer_to_Q1', 'assumptions', 'redundant_assumption', 'new_problem', 'solution_for_new_problem'. "
+            "Guideline_2: If there is a redundant assumption, output your answer as a JSON object with keys: 'answer_to_Q1', 'assumptions' (without redundant assumption), 'redundant_assumption', 'new_problem', 'solution_for_new_problem'. "
             "Guideline_3: If there is not a redundant assumption, output JSON with 'answer_to_Q1', 'assumptions', 'redundant_assumption: no', 'new_problem: no' and 'solution_for_new_problem: no'. "
             "Guideline_4: Store the plan via save_note, then hand off succinctly. "
             + parser1.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
