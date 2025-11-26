@@ -205,7 +205,7 @@ class MultiAgentSystem:
                         "running_input": running_input,
                     }
                 )
-                with open("running_input.json", "w", encoding="utf-8") as f:
+                with open("running_input.json", "a", encoding="utf-8") as f:
                     json.dump(running_input_log, f, ensure_ascii=False, indent=4)
                 print("="*100)
                 print("running_input: ", running_input)
