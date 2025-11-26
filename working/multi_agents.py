@@ -249,7 +249,17 @@ def main():
     Answer the question Q1: 'Does it problem have a redundant assumption?'
     If it has, create a new problem that we can deduce the redundant assumption from the other assumptions.
 
-    Now we have the new problem. Your task is to solve the new problem.
+    Now we have the new problem. Your task is to prove the new problem.
+    You need to write down the new problem follow the structure
+    Assumptions:
+    Assumption <number>: <Write the first assumption here>
+    Assumption <number>: ...
+    ...
+    Problem:
+    <Write the redundant assumption here>
+
+    Proof:
+    <You need to prove the new problem. You need to prove that you can deduce redundant assumption from the others redundant assumption>
     """,
         guidelines=(
             "Guideline_1: Answer the question Q1 using the format 'answer_to_Q1'. "
