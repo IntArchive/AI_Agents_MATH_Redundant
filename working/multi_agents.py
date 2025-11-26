@@ -155,7 +155,7 @@ class MultiAgentSystem:
                         handoff_lines.append(f"Answer to Q1: {parsed.answer_to_Q1}")
                         print("co redundant assumption? Answer: ", parsed.redundant_assumption)
                         if parsed.redundant_assumption:
-                            filtered_assumptions = [a for a in (parsed.assumptions or []) if a != parsed.redundant_assumption]
+                            filtered_assumptions = [a for a in (parsed.assumptions or []) if a in parsed.redundant_assumption]
                             filtered_assumptions = [
                                 "Assumption " + str(i + 1) + ": " + a for i, a in enumerate(filtered_assumptions)
                             ] if filtered_assumptions else []
