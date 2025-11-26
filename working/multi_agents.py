@@ -126,6 +126,7 @@ class MultiAgentSystem:
         self.transcript = [{"speaker": "user", "text": user_task}]
         running_input = user_task
         process = {}
+        running_input_log: list[dict[str, Any]] = []
 
         for round_idx in range(1, self.max_rounds + 1):
             for role in self.roles:
@@ -196,6 +197,16 @@ class MultiAgentSystem:
 
                 # keep passing along the latest output
                 running_input = output
+
+                running_input_log.append(
+                    {
+                        "round": round_idx,
+                        "role": role.name,
+                        "running_input": running_input,
+                    }
+                )
+                with open("running_input.json", "w", encoding="utf-8") as f:
+                    json.dump(running_input_log, f, ensure_ascii=False, indent=4)
                 print("="*100)
                 print("running_input: ", running_input)
                 print("="*100)
