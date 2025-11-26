@@ -208,8 +208,9 @@ class MultiAgentSystem:
                 # stop condition
                 for line in output.splitlines():
                     if line.strip().startswith("final:"):
+                        running_input_log.insert(0, {"user": user_task})
                         with open("running_input.json", "a", encoding="utf-8") as f:
-                            json.dump(running_input_log.insert(0, {"user": user_task}), f, ensure_ascii=False, indent=4)
+                            json.dump(running_input_log, f, ensure_ascii=False, indent=4)
                         return process 
         # if nobody concluded with final:
         return "no agent produced a final answer within the round limit."
