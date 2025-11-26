@@ -181,6 +181,10 @@ class MultiAgentSystem:
                         output += "\n(Note: There was an error parsing the structured output.)\n"
                     # If parsing failed, still pass along the best-effort output
                     running_input = output
+                    print("This is judge and the running output is: ")
+                    print("*()++++++++")
+                    print(output)
+                    print("*()++++++++")
 
                 # Record the actual output from this role in the transcript
                 self.transcript.append({"speaker": role.name, "text": output})
