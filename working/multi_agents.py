@@ -288,31 +288,31 @@ def main():
         tools=[save_note, read_notes],
     )
 
-    # planner = build_agent(
-    #     llm=llm_deepseek,
-    #     name="proof strategy planner",
-    #     goal="""
-    # Read a structured mathematics problem. 
-    # Now break this mathematic problem into clear, minimal steps and note them. 
-    # Use save_note to let mathematician and proof writer read your proof sketch.""",
-    #     guidelines=(
-    #         "Guideline_1: Output your answer as a JSON object with keys:'proof_sketch'. "
-    #         "Guideline_3: Store the plan via save_note, then hand off succinctly. "
-    #         "Guideline_4: Use the following format for your proof sketch: Step 1) ... \nStep 2) ... \nStep <number_of_steps>) ..."
-    #         + parser2.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
-    #     ),
-    #     tools=[save_note, read_notes],
-    # )
+    planner = build_agent(
+        llm=llm_deepseek,
+        name="proof strategy planner",
+        goal="""
+    Read a structured mathematics problem. 
+    Now break this mathematic problem into clear, minimal steps and note them. 
+    Use save_note to let mathematician and proof writer read your proof sketch.""",
+        guidelines=(
+            "Guideline_1: Output your answer as a JSON object with keys:'proof_sketch'. "
+            "Guideline_3: Store the plan via save_note, then hand off succinctly. "
+            "Guideline_4: Use the following format for your proof sketch: Step 1) ... \nStep 2) ... \nStep <number_of_steps>) ..."
+            + parser2.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
+        ),
+        tools=[save_note, read_notes],
+    )
 
-    # mathematician = build_agent(
-    #     llm=llm_deepseek,
-    #     name="mathematician and proof writer",
-    #     goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals. Write a complete proof for the problem instead.",
-    #     guidelines=(
-    #         "follow the plan from shared notes, write a complete proof. "
-    #     ),
-    #     tools=[python_repl, save_note, read_notes],
-    # )
+    mathematician = build_agent(
+        llm=llm_deepseek,
+        name="mathematician and proof writer",
+        goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals. Write a complete proof for the problem instead.",
+        guidelines=(
+            "follow the plan from shared notes, write a complete proof. "
+        ),
+        tools=[python_repl, save_note, read_notes],
+    )
 
     reviewer = build_agent(
         llm=llm_gemini_2,
@@ -331,6 +331,8 @@ def main():
     system = MultiAgentSystem(
         roles=[
             role("judge", judge),
+            role("proof strategy planner", planner),
+            role("mathematician and proof writer", mathematician),
             role("final reviewer", reviewer),
         ],
         max_rounds=6,
