@@ -32,9 +32,11 @@ import json
 
 # 1. Define the schema
 class JudgeOutput(BaseModel):
-    answer_to_Q1: str
+    answer_to_Q1: str = ""
     assumptions: Optional[List[str]] = None
     redundant_assumption: Optional[str] = None
+    new_problem: Optional[str] = None
+    solution_for_new_problem: Optional[str] = None
 
 class PlannerOutput(BaseModel):
     proof_sketch: Optional[str] = None
@@ -115,7 +117,6 @@ class MultiAgentSystem:
     - feeds the latest transcript to each agent in turn.
     - stops when any agent outputs a line starting with 'final:'.
     """
-
     def __init__(self, roles: list[role], max_rounds: int = 6):
         self.roles = roles
         self.max_rounds = max_rounds
@@ -125,6 +126,7 @@ class MultiAgentSystem:
         self.transcript = [{"speaker": "user", "text": user_task}]
         running_input = user_task
         process = {}
+        running_input_log: list[dict[str, Any]] = []
 
         for round_idx in range(1, self.max_rounds + 1):
             for role in self.roles:
@@ -149,34 +151,73 @@ class MultiAgentSystem:
                     try:
                         parser = PydanticOutputParser(pydantic_object=JudgeOutput)
                         parsed = parser.parse(output)
-                        output = f"Answer to Q1: {parsed.answer_to_Q1}\n"
-                        print("co redundant assumption:", parsed.redundant_assumption)
+                        # Build a clear handoff message for the reviewer including the new problem and its solution
+                        handoff_lines = []
+                        handoff_lines.append(f"Answer to Q1: {parsed.answer_to_Q1}")
+                        print("co redundant assumption? Answer: ", parsed.redundant_assumption)
                         if parsed.redundant_assumption:
-                            l = [i for i in parsed.assumptions if i != parsed.redundant_assumption] 
-                            l = ["Assumption " + str(i+1) + ": " + a for i, a in enumerate(l)] if l else []
-                            output += "Assumptions:\n" + "\n".join(l) + "\n"
-                            output += f"Problem: \n{find_text_in_rddassumption(parsed.redundant_assumption)}\n"
+                            filtered_assumptions = [a for a in (parsed.assumptions or []) if a in parsed.redundant_assumption]
+                            filtered_assumptions = [
+                                "Assumption " + str(i + 1) + ": " + a for i, a in enumerate(filtered_assumptions)
+                            ] if filtered_assumptions else []
+                            if filtered_assumptions:
+                                handoff_lines.append("Assumptions (without redundant one):")
+                                handoff_lines.extend(filtered_assumptions)
+                            # Prefer explicit new_problem from the judge output, otherwise fall back
+                            new_problem_text = parsed.new_problem or find_text_in_rddassumption(parsed.redundant_assumption)
+                            handoff_lines.append("New_problem:")
+                            handoff_lines.append(new_problem_text)
+                            # Include the judge's solution for reviewer to verify
+                            if parsed.solution_for_new_problem:
+                                handoff_lines.append("Solution_for_new_problem:")
+                                handoff_lines.append(parsed.solution_for_new_problem)
                         else:
-                            output += "Redundant Assumption: no\n. End final:"
+                            handoff_lines.append("Redundant Assumption: no")
+                            # No new problem to solve; still pass concise status forward for review
+                        output = "\n".join(handoff_lines) + "\n"
+                        # Ensure next role receives the enriched message
+                        running_input = output
                     except Exception as e:
                         print("Parsing error:", e)
                         output += "\n(Note: There was an error parsing the structured output.)\n"
-                    running_input = "New_problem:\n" + output  # Update running_input to the processed output
+                    # If parsing failed, still pass along the best-effort output
+                    running_input = output
+                    print("This is judge and the running output is: ")
+                    print("*()++++++++")
+                    print(output)
+                    print("*()++++++++")
 
-                self.transcript.append({"speaker": role.name, "text": running_input})
+                # Record the actual output from this role in the transcript
+                self.transcript.append({"speaker": role.name, "text": output})
+
+                # keep passing along the latest output
+                running_input = output
+
+                running_input_log.append(
+                    {
+                        "round": round_idx,
+                        "role": role.name,
+                        "running_input": running_input,
+                    }
+                )
+
+                print("="*100)
+                print("running_input:  ", running_input)
+                print("="*100)
 
                 # stop condition
                 for line in output.splitlines():
                     if line.strip().startswith("final:"):
+                        running_input_log.insert(0, {"user": user_task})
+                        with open("running_input_Prob_WITHOUT_RA.json", "a", encoding="utf-8") as f:
+                            json.dump(running_input_log, f, ensure_ascii=False, indent=4)
                         return process 
-
-                # keep passing along the latest output
-                running_input = output
         # if nobody concluded with final:
         return "no agent produced a final answer within the round limit."
 
 def main():    
     config = setup.setup()
+    save_path = config.save_path
     data = pd.read_excel(config.file_path)
     data["judge"] = ""
     data["proof strategy planner"] = ""
@@ -196,7 +237,7 @@ def main():
         )
     
     llm_gemini = ChatGoogleGenerativeAI(
-        model="gemini-2.5-pro",
+        model="gemini-2.5-flash",
         temperature=0,
         max_tokens=None,
         timeout=None,
@@ -204,56 +245,77 @@ def main():
         # other params...
     )
 
+    llm_gemini_2 = ChatGoogleGenerativeAI( 
+        model="gemini-2.5-pro", 
+        temperature=0,
+        max_tokens=None,
+        timeout=None,
+        max_retries=2,
+        # other params...
+    )
 
     parser1 = PydanticOutputParser(pydantic_object=JudgeOutput )    
     parser2 = PydanticOutputParser(pydantic_object=PlannerOutput)
     # define three agents with different responsibilities
     # 3. Add parser instructions to your guidelines or prompt
     judge = build_agent(
-        llm=llm_gemini,
+        llm=llm_deepseek,
         name="judge",
         goal="""
     Read a structured mathematics problem. 
     Answer the question Q1: 'Does it problem have a redundant assumption?'
-    If it has, create a new problem that we can deduce the redundant assumption from the other assumptions.""",
+    If it has, create a new problem that we can deduce the redundant assumption from the other assumptions.
+
+    Now we have the new problem. Your task is to prove the new problem.
+    You need to write down the new problem follow the structure
+    Assumptions:
+    Assumption <number>: <Write the first assumption here>
+    Assumption <number>: ...
+    ...
+    Problem:
+    <Write the redundant assumption here>
+
+    Proof:
+    <You need to prove the new problem. You need to prove that you can deduce redundant assumption from the others redundant assumption>
+    """,
         guidelines=(
             "Guideline_1: Answer the question Q1 using the format 'answer_to_Q1'. "
-            "Guideline_2: If there is a redundant assumption, output your answer as a JSON object with keys: 'answer_to_Q1', 'assumptions' and 'redundant_assumption'. "
-            "Guideline_3: If there is not a redundant assumption, output JSON with 'answer_to_Q1' and 'redundant_assumption: no'. "
+            "Guideline_2: If there is a redundant assumption, output your answer as a JSON object with keys: 'answer_to_Q1', 'assumptions' (without redundant assumption), 'redundant_assumption', 'new_problem', 'solution_for_new_problem'. "
+            "Guideline_3: If there is not a redundant assumption, output JSON with 'answer_to_Q1', 'assumptions', 'redundant_assumption: no', 'new_problem: no' and 'solution_for_new_problem: no'. "
             "Guideline_4: Store the plan via save_note, then hand off succinctly. "
             + parser1.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
         ),
         tools=[save_note, read_notes],
     )
 
-    planner = build_agent(
-        llm=llm_deepseek,
-        name="proof strategy planner",
-        goal="""
-    Read a structured mathematics problem. 
-    Now break this mathematic problem into clear, minimal steps and note them. 
-    Use save_note to let mathematician and proof writer read your proof sketch.""",
-        guidelines=(
-            "Guideline_1: Output your answer as a JSON object with keys:'proof_sketch'. "
-            "Guideline_3: Store the plan via save_note, then hand off succinctly. "
-            "Guideline_4: Use the following format for your proof sketch: Step 1) ... \nStep 2) ... \nStep <number_of_steps>) ..."
-            + parser2.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
-        ),
-        tools=[save_note, read_notes],
-    )
+    # planner = build_agent(
+    #     llm=llm_deepseek,
+    #     name="proof strategy planner",
+    #     goal="""
+    # Read a structured mathematics problem. 
+    # Now break this mathematic problem into clear, minimal steps and note them. 
+    # Use save_note to let mathematician and proof writer read your proof sketch.""",
+    #     guidelines=(
+    #         "Guideline_1: Output your answer as a JSON object with keys:'proof_sketch'. "
+    #         "Guideline_3: Store the plan via save_note, then hand off succinctly. "
+    #         "Guideline_4: Use the following format for your proof sketch: Step 1) ... \nStep 2) ... \nStep <number_of_steps>) ..."
+    #         + parser2.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
+    #     ),
+    #     tools=[save_note, read_notes],
+    # )
 
-    mathematician = build_agent(
-        llm=llm_deepseek,
-        name="mathematician and proof writer",
-        goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals. Write a complete proof for the problem instead.",
-        guidelines=(
-            "follow the plan from shared notes, write a complete proof. "
-        ),
-        tools=[python_repl, save_note, read_notes],
-    )
+    # mathematician = build_agent(
+    #     llm=llm_deepseek,
+    #     name="mathematician and proof writer",
+    #     goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals. Write a complete proof for the problem instead.",
+    #     guidelines=(
+    #         "follow the plan from shared notes, write a complete proof. "
+    #     ),
+    #     tools=[python_repl, save_note, read_notes],
+    # )
 
     reviewer = build_agent(
-        llm=llm_gemini,
+        llm=llm_gemini_2,
         name="final reviewer",
         goal="check correctness of the proof; then present the clean, final result.",
         guidelines=(
@@ -269,14 +331,12 @@ def main():
     system = MultiAgentSystem(
         roles=[
             role("judge", judge),
-            role("proof strategy planner", planner),
-            role("mathematician and proof writer", mathematician),
             role("final reviewer", reviewer),
         ],
         max_rounds=6,
     )
 
-    for i in range(0, 100, 1):
+    for i in range(0, 50, 1):
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n" + task)
         final_answer = system.run(task)
@@ -290,14 +350,17 @@ def main():
             data.at[i, "Redundant_assumption"] = redundant_assumption
         # Save the current row as JSON for inspection
         row_json = data.iloc[i].to_json(force_ascii=False, indent=4)
-        if os.path.lexists(Path("./Problem_WOUT_RA")):
+
+
+
+        
+        if os.path.lexists(Path(save_path)):
             pass
         else:
-            os.mkdir(Path("./Problem_WOUT_RA"))
-        with open(Path(f"./Problem_WOUT_RA/result_task_{i}.json"), "w", encoding="utf-8") as f_json:
+            os.mkdir(Path(save_path))
+        with open(Path(f"{save_path}/result_task_{i}.json"), "w", encoding="utf-8") as f_json:
             f_json.write(row_json)
-        # data.to_excel("result.xlsx", index=False)
-        # print("\n=== final answer ===\n" + final_answer)
+
 
 
 if __name__ == "__main__":
