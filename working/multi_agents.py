@@ -196,7 +196,7 @@ def main():
         )
     
     llm_gemini = ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash",
+        model="gemini-2.5-pro",
         temperature=0,
         max_tokens=None,
         timeout=None,
@@ -276,7 +276,7 @@ def main():
         max_rounds=6,
     )
 
-    for i in range(0, 60, 1):
+    for i in range(0, 100, 1):
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n" + task)
         final_answer = system.run(task)
