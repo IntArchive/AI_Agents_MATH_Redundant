@@ -127,7 +127,6 @@ class MultiAgentSystem:
         running_input = user_task
         process = {}
         running_input_log: list[dict[str, Any]] = []
-
         for round_idx in range(1, self.max_rounds + 1):
             for role in self.roles:
                 # assemble a short context window from the transcript
@@ -211,9 +210,16 @@ class MultiAgentSystem:
                         running_input_log.insert(0, {"user": user_task})
                         with open("running_input_Prob_WITHOUT_RA.json", "a", encoding="utf-8") as f:
                             json.dump(running_input_log, f, ensure_ascii=False, indent=4)
+                        # attach conversation logs so caller can persist them
+                        process["__transcript__"] = self.transcript
+                        process["__running_log__"] = running_input_log
                         return process 
         # if nobody concluded with final:
-        return "no agent produced a final answer within the round limit."
+        return {
+            "error": "no agent produced a final answer within the round limit.",
+            "__transcript__": self.transcript,
+            "__running_log__": running_input_log,
+        }
 
 def main():    
     config = setup.setup()
@@ -342,26 +348,42 @@ def main():
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n" + task)
         final_answer = system.run(task)
+        # Extract conversation transcript for logging
+        conversation = final_answer.get("__transcript__", [])
+        running_log = final_answer.get("__running_log__", [])
         data.at[i, "judge"] = final_answer.get("judge", "")
         data.at[i, "proof strategy planner"] = final_answer.get("proof strategy planner", "")
         data.at[i, "mathematician and proof writer"] = final_answer.get("mathematician and proof writer", "")
         data.at[i, "final reviewer"] = final_answer.get("final reviewer", "")
-        if "Redundant Assumption:" in final_answer:
+        if "Redundant Assumption:" in str(final_answer):
             print("Here -------------")
-            redundant_assumption = final_answer.split("Redundant Assumption:")[-1].strip()
+            redundant_assumption = str(final_answer).split("Redundant Assumption:")[-1].strip()
             data.at[i, "Redundant_assumption"] = redundant_assumption
         # Save the current row as JSON for inspection
         row_json = data.iloc[i].to_json(force_ascii=False, indent=4)
 
-
-
-        
         if os.path.lexists(Path(save_path)):
             pass
         else:
             os.mkdir(Path(save_path))
+
+        # Save per-task result
         with open(Path(f"{save_path}/result_task_{i}.json"), "w", encoding="utf-8") as f_json:
             f_json.write(row_json)
+
+        # Save per-task conversation log (user, judge, planner, mathematician, reviewer)
+        with open(Path(f"{save_path}/conversation_task_{i}.json"), "w", encoding="utf-8") as f_conv:
+            json.dump(
+                {
+                    "task_index": i,
+                    "problem": task,
+                    "transcript": conversation,
+                    "running_log": running_log,
+                },
+                f_conv,
+                ensure_ascii=False,
+                indent=4,
+            )
 
 
 
