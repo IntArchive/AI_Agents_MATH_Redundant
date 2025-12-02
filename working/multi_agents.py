@@ -351,10 +351,28 @@ def main():
         # Extract conversation transcript for logging
         conversation = final_answer.get("__transcript__", [])
         running_log = final_answer.get("__running_log__", [])
-        data.at[i, "judge"] = final_answer.get("judge", "")
-        data.at[i, "proof strategy planner"] = final_answer.get("proof strategy planner", "")
-        data.at[i, "mathematician and proof writer"] = final_answer.get("mathematician and proof writer", "")
-        data.at[i, "final reviewer"] = final_answer.get("final reviewer", "")
+
+        # Build per-role *context seen by the agent* using running_log (what each role received as input)
+        role_names = [
+            "judge",
+            "proof strategy planner",
+            "mathematician and proof writer",
+            "final reviewer",
+        ]
+        role_contexts = {
+            role_name: "\n\n".join(
+                entry.get("running_input", "")
+                for entry in running_log
+                if entry.get("role") == role_name
+            )
+            for role_name in role_names
+        }
+
+        # Save that context into the DataFrame columns
+        data.at[i, "judge"] = role_contexts.get("judge", "")
+        data.at[i, "proof strategy planner"] = role_contexts.get("proof strategy planner", "")
+        data.at[i, "mathematician and proof writer"] = role_contexts.get("mathematician and proof writer", "")
+        data.at[i, "final reviewer"] = role_contexts.get("final reviewer", "")
         if "Redundant Assumption:" in str(final_answer):
             print("Here -------------")
             redundant_assumption = str(final_answer).split("Redundant Assumption:")[-1].strip()
@@ -379,6 +397,7 @@ def main():
                     "problem": task,
                     "transcript": conversation,
                     "running_log": running_log,
+                    "role_contexts": role_contexts,
                 },
                 f_conv,
                 ensure_ascii=False,
