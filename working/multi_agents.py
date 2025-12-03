@@ -145,12 +145,12 @@ class MultiAgentSystem:
                 print("="*100)
                 # each agent receives the last few turns as input
                 result = role.executor.invoke({"input": context})
-                print("="*100)
-                print("type(result): ", type(result))
-                print("keys: ", result.keys())
-                print("result: ", result)
-                print("dir(result): ", dir(result))
-                print("="*100)
+                # print("="*100)
+                # print("type(result): ", type(result))
+                # print("keys: ", result.keys())
+                # print("result: ", result)
+                # print("dir(result): ", dir(result))
+                # print("="*100)
                 if role.name == "judge":
                     with open("data.json", "w", encoding="utf-8") as f:
                         json.dump(result, f, ensure_ascii=False, indent=4)
