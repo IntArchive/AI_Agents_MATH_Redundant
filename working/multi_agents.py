@@ -406,7 +406,7 @@ def main():
         max_rounds=6,
     )
 
-    for i in range(4, 50, 1):
+    for i in range(8, 50, 1):
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n")
         final_answer = system.run(task) 
