@@ -39,7 +39,12 @@ class JudgeOutput(BaseModel):
     solution_for_new_problem: Optional[str] = None
 
 class PlannerOutput(BaseModel):
+    new_problem: Optional[str] = None
     proof_sketch: Optional[str] = None
+
+class MathematicianOutput(BaseModel):
+    new_problem: Optional[str] = None
+    detailed_proof: Optional[str] = None
 
 # ---------- tools ----------
 # (you can add more tools later. keep them simple to start.)
@@ -134,7 +139,10 @@ class MultiAgentSystem:
                     context = "\n".join([f"{t['speaker']}: {t['text']}" for t in self.transcript[-1:]])
                 else:
                     context = running_input
-                
+                print("role: ", role.name)
+                print("context: ", context)
+                print("="*100)
+                print("="*100)
                 # each agent receives the last few turns as input
                 result = role.executor.invoke({"input": context})
                 if role.name == "judge":
@@ -146,14 +154,14 @@ class MultiAgentSystem:
 
 
                 if role.name == "judge":
-                    print("Is it here?*********************************")
+                    # print("Is it here?*********************************")
                     try:
                         parser = PydanticOutputParser(pydantic_object=JudgeOutput)
                         parsed = parser.parse(output)
                         # Build a clear handoff message for the reviewer including the new problem and its solution
                         handoff_lines = []
                         handoff_lines.append(f"Answer to Q1: {parsed.answer_to_Q1}")
-                        print("co redundant assumption? Answer: ", parsed.redundant_assumption)
+                        # print("co redundant assumption? Answer: ", parsed.redundant_assumption)
                         if parsed.redundant_assumption:
                             filtered_assumptions = [a for a in (parsed.assumptions or []) if a in parsed.redundant_assumption]
                             filtered_assumptions = [
@@ -177,14 +185,14 @@ class MultiAgentSystem:
                         # Ensure next role receives the enriched message
                         running_input = output
                     except Exception as e:
-                        print("Parsing error:", e)
+                        # print("Parsing error:", e)
                         output += "\n(Note: There was an error parsing the structured output.)\n"
                     # If parsing failed, still pass along the best-effort output
                     running_input = output
-                    print("This is judge and the running output is: ")
-                    print("*()++++++++")
-                    print(output)
-                    print("*()++++++++")
+                    # print("This is judge and the running output is: ")
+                    # print("*()++++++++")
+                    # print(output)
+                    # print("*()++++++++")
 
                 # Record the actual output from this role in the transcript
                 self.transcript.append({"speaker": role.name, "text": output})
@@ -200,9 +208,9 @@ class MultiAgentSystem:
                     }
                 )
 
-                print("="*100)
-                print("running_input:  ", running_input)
-                print("="*100)
+                # print("="*100)
+                # print("running_input:  ", running_input)
+                # print("="*100)
 
                 # stop condition
                 for line in output.splitlines():
@@ -262,6 +270,8 @@ def main():
 
     parser1 = PydanticOutputParser(pydantic_object=JudgeOutput )    
     parser2 = PydanticOutputParser(pydantic_object=PlannerOutput)
+    parser3 = PydanticOutputParser(pydantic_object=MathematicianOutput)
+    
     # define three agents with different responsibilities
     # 3. Add parser instructions to your guidelines or prompt
     judge = build_agent(
@@ -302,7 +312,7 @@ def main():
     Now break this mathematic problem into clear, minimal steps and note them. 
     Use save_note to let mathematician and proof writer read your proof sketch.""",
         guidelines=(
-            "Guideline_1: Output your answer as a JSON object with keys:'proof_sketch'. "
+            "Guideline_1: Output your answer as a JSON object with keys:'new_problem', 'proof_sketch'. "
             "Guideline_3: Store the plan via save_note, then hand off succinctly. "
             "Guideline_4: Use the following format for your proof sketch: Step 1) ... \nStep 2) ... \nStep <number_of_steps>) ..."
             + parser2.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
@@ -315,7 +325,9 @@ def main():
         name="mathematician and proof writer",
         goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals. Write a complete proof for the problem instead.",
         guidelines=(
+            "Guideline_1: Output your answer as a JSON object with keys:'new_problem', 'detailed_proof'. "
             "follow the plan from shared notes, write a complete proof. "
+            + parser3.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
         ),
         tools=[python_repl, save_note, read_notes],
     )
@@ -346,7 +358,7 @@ def main():
 
     for i in range(0, 50, 1):
         task = problem_column.iloc[i]
-        print(f"\n\n=========================== TASK {i} ===================================\n" + task)
+        # print(f"\n\n=========================== TASK {i} ===================================\n" + task)
         final_answer = system.run(task)
         # Extract conversation transcript for logging
         conversation = final_answer.get("__transcript__", [])
@@ -374,7 +386,7 @@ def main():
         data.at[i, "mathematician and proof writer"] = role_contexts.get("mathematician and proof writer", "")
         data.at[i, "final reviewer"] = role_contexts.get("final reviewer", "")
         if "Redundant Assumption:" in str(final_answer):
-            print("Here -------------")
+            # print("Here -------------")
             redundant_assumption = str(final_answer).split("Redundant Assumption:")[-1].strip()
             data.at[i, "Redundant_assumption"] = redundant_assumption
         # Save the current row as JSON for inspection
