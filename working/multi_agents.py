@@ -145,6 +145,11 @@ class MultiAgentSystem:
                 print("="*100)
                 # each agent receives the last few turns as input
                 result = role.executor.invoke({"input": context})
+                print("="*100)
+                print("type(result): ", type(result))
+                print("result: ", result)
+                print("dir(result): ", dir(result))
+                print("="*100)
                 if role.name == "judge":
                     with open("data.json", "w", encoding="utf-8") as f:
                         json.dump(result, f, ensure_ascii=False, indent=4)
@@ -326,7 +331,7 @@ def main():
         goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals. Write a complete proof for the problem instead.",
         guidelines=(
             "Guideline_1: Output your answer as a JSON object with keys:'new_problem', 'detailed_proof'. "
-            "follow the plan from shared notes, write a complete proof. "
+            "Guideline_2: follow the plan from shared notes, write a complete proof. "
             + parser3.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
         ),
         tools=[python_repl, save_note, read_notes],
@@ -358,7 +363,7 @@ def main():
 
     for i in range(0, 50, 1):
         task = problem_column.iloc[i]
-        # print(f"\n\n=========================== TASK {i} ===================================\n" + task)
+        print(f"\n\n=========================== TASK {i} ===================================\n")
         final_answer = system.run(task)
         # Extract conversation transcript for logging
         conversation = final_answer.get("__transcript__", [])
