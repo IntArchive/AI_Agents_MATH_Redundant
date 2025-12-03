@@ -26,6 +26,7 @@ from utils.parsing import PlannerOutput
 
 from pydantic import BaseModel
 from langchain.output_parsers import PydanticOutputParser
+import re
 import json
 # import os
 # os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = r"C:\Users\haidm18\Documents\My_git\ma_IMO\working\asset\client_secret_351517674646-cq0k028ebrpdfgio4avoeacbeiuvdpd8.apps.googleusercontent.com.json"
@@ -46,6 +47,9 @@ class MathematicianOutput(BaseModel):
     new_problem: Optional[str] = None
     detailed_proof: Optional[str] = None
 
+class FinalReviewerOutput(BaseModel):
+    proof_review: Optional[bool] = None
+    end_of_proof: Optional[str] = "final:"
 # ---------- tools ----------
 # (you can add more tools later. keep them simple to start.)
 
@@ -75,6 +79,20 @@ def find_text_in_rddassumption(text: str) -> str:
         if len(parts) == 2:
             return parts[1].strip()
     return text
+
+
+def extract_json_obj(text: str) -> dict:
+    """
+    Extract the first JSON object found in `text` and return it as a Python dict.
+    Assumes there are no extra braces `{` or `}` inside string values.
+    """
+    # Find text between the first '{' and the last '}' (including newlines)
+    match = re.search(r'\{.*\}', text, flags=re.DOTALL)
+    if not match:
+        raise ValueError("No JSON object found in the input text.")
+    
+    json_str = match.group(0)
+    return json.loads(json_str)
 
 # add a safe python tool so the coder can run tiny snippets.
 python_repl = PythonREPLTool()
@@ -110,6 +128,7 @@ general rules:
     return AgentExecutor(agent=agent, tools=tools, verbose=False, handle_parsing_errors=True)
 
 
+        
 # ---------- orchestrator ----------
 @dataclass
 class role:
@@ -132,6 +151,10 @@ class MultiAgentSystem:
         running_input = user_task
         process = {}
         running_input_log: list[dict[str, Any]] = []
+        new_problem: str = ""
+        proof_sketch: str = ""
+        detailed_proof: str = ""
+        end_of_proof: bool = False
         for round_idx in range(1, self.max_rounds + 1):
             for role in self.roles:
                 # assemble a short context window from the transcript
@@ -139,24 +162,39 @@ class MultiAgentSystem:
                     context = "\n".join([f"{t['speaker']}: {t['text']}" for t in self.transcript[-1:]])
                 else:
                     context = running_input
-                print("role: ", role.name)
-                print("context: ", context)
-                print("="*100)
-                print("="*100)
+                # print("role: ", role.name)
+                # print("context: ", context)
+                # print("="*100)
+                # print("="*100)
                 # each agent receives the last few turns as input
                 result = role.executor.invoke({"input": context})
-                # print("="*100)
-                # print("type(result): ", type(result))
-                # print("keys: ", result.keys())
-                # print("result: ", result)
-                # print("dir(result): ", dir(result))
-                # print("="*100)
-                if role.name == "judge":
-                    with open("data.json", "w", encoding="utf-8") as f:
-                        json.dump(result, f, ensure_ascii=False, indent=4)
-
                 process[role.name] = result["output"]
                 output = result["output"]
+
+
+                if role.name == "judge":
+                    parser = PydanticOutputParser(pydantic_object=JudgeOutput)
+                    parsed = parser.parse(output)
+                    new_problem = parsed.new_problem
+                    print("new_problem: ", new_problem)
+                elif role.name == "proof strategy planner":
+                    parser = PydanticOutputParser(pydantic_object=PlannerOutput)
+                    parsed = parser.parse(output)
+                    proof_sketch = parsed.proof_sketch
+                    print("proof_sketch: ", proof_sketch)
+                elif role.name == "mathematician and proof writer":
+                    parser = PydanticOutputParser(pydantic_object=MathematicianOutput)
+                    parsed = parser.parse(output)
+                    detailed_proof = parsed.detailed_proof
+                    print("detailed_proof: ", detailed_proof)
+                elif role.name == "final reviewer":
+                    parser = PydanticOutputParser(pydantic_object=FinalReviewerOutput)
+                    parsed = parser.parse(output)
+                    end_of_proof = parsed.end_of_proof
+                    print("end_of_proof: ", end_of_proof)
+
+                    
+                
 
 
                 if role.name == "judge":
@@ -199,12 +237,15 @@ class MultiAgentSystem:
                     # print("*()++++++++")
                     # print(output)
                     # print("*()++++++++")
+                elif role.name == "proof strategy planner":
+                    running_input = new_problem + "\n" + proof_sketch
+                elif role.name == "mathematician and proof writer":
+                    running_input = new_problem + "\n" + detailed_proof
+                elif role.name == "final reviewer":
+                    running_input = output
 
                 # Record the actual output from this role in the transcript
                 self.transcript.append({"speaker": role.name, "text": output})
-
-                # keep passing along the latest output
-                running_input = output
 
                 running_input_log.append(
                     {
@@ -277,6 +318,7 @@ def main():
     parser1 = PydanticOutputParser(pydantic_object=JudgeOutput )    
     parser2 = PydanticOutputParser(pydantic_object=PlannerOutput)
     parser3 = PydanticOutputParser(pydantic_object=MathematicianOutput)
+    parser4 = PydanticOutputParser(pydantic_object=FinalReviewerOutput)
     
     # define three agents with different responsibilities
     # 3. Add parser instructions to your guidelines or prompt
@@ -284,12 +326,12 @@ def main():
         llm=llm_deepseek,
         name="judge",
         goal="""
-    Read a structured mathematics problem. 
+    Read a structured mathematics problem and write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines.
     Answer the question Q1: 'Does it problem have a redundant assumption?'
     If it has, create a new problem that we can deduce the redundant assumption from the other assumptions.
 
     Now we have the new problem. Your task is to prove the new problem.
-    You need to write down the new problem follow the structure
+    You need to write down the new problem follow the structure and then add the new problem to JSON object as mentioned in Guideline_2.
     Assumptions:
     Assumption <number>: <Write the first assumption here>
     Assumption <number>: ...
@@ -314,7 +356,7 @@ def main():
         llm=llm_deepseek,
         name="proof strategy planner",
         goal="""
-    Read a structured mathematics problem. 
+    Read a structured mathematics problem and write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines.
     Now break this mathematic problem into clear, minimal steps and note them. 
     Use save_note to let mathematician and proof writer read your proof sketch.""",
         guidelines=(
@@ -329,7 +371,7 @@ def main():
     mathematician = build_agent(
         llm=llm_deepseek,
         name="mathematician and proof writer",
-        goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals. Write a complete proof for the problem instead.",
+        goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals and write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines. Write a complete proof for the problem instead.",
         guidelines=(
             "Guideline_1: Output your answer as a JSON object with keys:'new_problem', 'detailed_proof'. "
             "Guideline_2: follow the plan from shared notes, write a complete proof. "
@@ -341,12 +383,14 @@ def main():
     reviewer = build_agent(
         llm=llm_gemini_2,
         name="final reviewer",
-        goal="check correctness of the proof; then present the clean, final result.",
+        goal="check correctness of the proof; write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines then present the clean, final result.",
         guidelines=(
-            "Guideline_1: read shared notes, verify the proof from mathematician and proof writer , and only conclude when satisfied (follow the format 'Proof: <True/False>). "
-            "Guideline_2: the final line must start with 'proof:' followed by the final answer."
-            "Guideline_3: if you believe the task is finished, clearly signal with a single line that starts with 'final:' followed by the result (no extra commentary after that line)."
-            "Guideline_4: After reviewing the proof, if it is correct, output the final answer and the original problem without redundant assumption. Then output 'final:'"
+            "Guideline_1: Output your answer as a JSON object with keys:'proof_review' (<True> or <False>), 'end_of_proof' (<final:> or <not final:>)'. "
+            # "Guideline_2: read shared notes, verify the proof from mathematician and proof writer , and only conclude when satisfied (follow the format 'Proof: <True/False>). "
+            # "Guideline_3: the final line must start with 'proof:' followed by the final answer."
+            "Guideline_4: if you believe the task is finished, clearly signal with a single line that starts with 'final:' followed by the result (no extra commentary after that line)."
+            "Guideline_5: After reviewing the proof, if it is correct, output the final answer and the original problem without redundant assumption. Then output 'final:'"
+            + parser4.get_format_instructions().replace("{", "{{").replace("}", "}}")
         ),
         tools=[read_notes, save_note],
     )
@@ -366,12 +410,12 @@ def main():
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n")
         final_answer = system.run(task) 
-        print("="*100)
-        print("type(final_answer): ", type(final_answer))
-        print("keys: ", final_answer.keys())
-        print("final_answer: ", final_answer)
-        print("dir(final_answer): ", dir(final_answer))
-        print("="*100)
+        # print("="*100)
+        # print("final_answer['judge']: ", final_answer["judge"])
+        # print("final_answer['proof strategy planner']: ", final_answer["proof strategy planner"])
+        # print("final_answer['mathematician and proof writer']: ", final_answer["mathematician and proof writer"])
+        # print("final_answer['final reviewer']: ", final_answer["final reviewer"])
+        # print("="*100)
         # Extract conversation transcript for logging
         conversation = final_answer.get("__transcript__", [])
         running_log = final_answer.get("__running_log__", [])
