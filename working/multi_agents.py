@@ -147,6 +147,7 @@ class MultiAgentSystem:
                 result = role.executor.invoke({"input": context})
                 print("="*100)
                 print("type(result): ", type(result))
+                print("keys: ", result.keys())
                 print("result: ", result)
                 print("dir(result): ", dir(result))
                 print("="*100)
@@ -364,7 +365,13 @@ def main():
     for i in range(0, 50, 1):
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n")
-        final_answer = system.run(task)
+        final_answer = system.run(task) 
+        print("="*100)
+        print("type(final_answer): ", type(final_answer))
+        print("keys: ", final_answer.keys())
+        print("final_answer: ", final_answer)
+        print("dir(final_answer): ", dir(final_answer))
+        print("="*100)
         # Extract conversation transcript for logging
         conversation = final_answer.get("__transcript__", [])
         running_log = final_answer.get("__running_log__", [])
