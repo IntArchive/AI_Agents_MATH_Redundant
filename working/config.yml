@@ -1,0 +1,5 @@
+deepseek_api: "sk-11efea697f564cff8c16d9cfbd1ae4ce"
+gemini_api: "AIzaSyCjaws1FoBf6DcJpSdzK2vPBgRQGXCcSzA"
+file_path: "./data/result_task_all.xlsx"
+save_path: "./data/Prob_WITH_RA"
+target_problem_col: "Problem_with_redundant_assumption"
