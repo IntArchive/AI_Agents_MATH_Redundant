@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 import sys
 from dataclasses import dataclass
+import asyncio
 from openai import OpenAI
 import pandas as pd
 
@@ -171,25 +172,38 @@ class MultiAgentSystem:
                 process[role.name] = result["output"]
                 output = result["output"]
 
+                # parse LLM output; prefer async parser when available
+                def _parse_with_async_support(parser, text):
+                    async def _aparse():
+                        if hasattr(parser, "aparse"):
+                            return await parser.aparse(text)
+                        loop = asyncio.get_running_loop()
+                        return await loop.run_in_executor(None, parser.parse, text)
+
+                    try:
+                        return asyncio.run(_aparse())
+                    except RuntimeError:
+                        # If already inside a running loop (e.g., notebook), fall back to sync parse.
+                        return parser.parse(text)
 
                 if role.name == "judge":
                     parser = PydanticOutputParser(pydantic_object=JudgeOutput)
-                    parsed = parser.parse(output)
+                    parsed = _parse_with_async_support(parser, output)
                     new_problem = parsed.new_problem
                     print("new_problem: ", new_problem)
                 elif role.name == "proof strategy planner":
                     parser = PydanticOutputParser(pydantic_object=PlannerOutput)
-                    parsed = parser.parse(output)
+                    parsed = _parse_with_async_support(parser, output)
                     proof_sketch = parsed.proof_sketch
                     print("proof_sketch: ", proof_sketch)
                 elif role.name == "mathematician and proof writer":
                     parser = PydanticOutputParser(pydantic_object=MathematicianOutput)
-                    parsed = parser.parse(output)
+                    parsed = _parse_with_async_support(parser, output)
                     detailed_proof = parsed.detailed_proof
                     print("detailed_proof: ", detailed_proof)
                 elif role.name == "final reviewer":
                     parser = PydanticOutputParser(pydantic_object=FinalReviewerOutput)
-                    parsed = parser.parse(output)
+                    parsed = _parse_with_async_support(parser, output)
                     end_of_proof = parsed.end_of_proof
                     print("end_of_proof: ", end_of_proof)
 
@@ -201,7 +215,7 @@ class MultiAgentSystem:
                     # print("Is it here?*********************************")
                     try:
                         parser = PydanticOutputParser(pydantic_object=JudgeOutput)
-                        parsed = parser.parse(output)
+                        parsed = _parse_with_async_support(parser, output)
                         # Build a clear handoff message for the reviewer including the new problem and its solution
                         handoff_lines = []
                         handoff_lines.append(f"Answer to Q1: {parsed.answer_to_Q1}")
