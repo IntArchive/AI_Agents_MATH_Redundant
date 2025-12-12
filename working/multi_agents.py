@@ -326,7 +326,7 @@ def main():
         llm=llm_deepseek,
         name="judge",
         goal="""
-    Read a structured mathematics problem and write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines.
+    Read a structured mathematics problem and write answers carefully and concisely follow the JSON structure or JSON object as mentioned in guidelines.
     Answer the question Q1: 'Does it problem have a redundant assumption?'
     If it has, create a new problem that we can deduce the redundant assumption from the other assumptions.
 
@@ -356,7 +356,7 @@ def main():
         llm=llm_deepseek,
         name="proof strategy planner",
         goal="""
-    Read a structured mathematics problem and write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines.
+    Read a structured mathematics problem and write answers carefully and concisely follow the JSON structure or JSON object as mentioned in guidelines.
     Now break this mathematic problem into clear, minimal steps and note them. 
     Use save_note to let mathematician and proof writer read your proof sketch.""",
         guidelines=(
@@ -371,7 +371,7 @@ def main():
     mathematician = build_agent(
         llm=llm_deepseek,
         name="mathematician and proof writer",
-        goal="Read the proof sketch of proof strategy planner and write a detailed proof for that subgoals and write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines. Write a complete proof for the problem instead.",
+        goal="Read the new problem and the proof sketch and write a detailed proof for those subgoals in proof sketch, note that write new_problem as what you were given and write complete detailed_proof carefully follow the JSON structure or JSON object as mentioned in guidelines.",
         guidelines=(
             "Guideline_1: Output your answer as a JSON object with keys:'new_problem', 'detailed_proof'. "
             "Guideline_2: follow the plan from shared notes, write a complete proof. "
@@ -406,7 +406,7 @@ def main():
         max_rounds=6,
     )
 
-    for i in range(8, 50, 1):
+    for i in range(0, 50, 1):
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n")
         final_answer = system.run(task) 
