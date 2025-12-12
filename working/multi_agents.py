@@ -149,6 +149,9 @@ class MultiAgentSystem:
 
     def run(self, user_task: str) -> str:
         self.transcript = [{"speaker": "user", "text": user_task}]
+        print("==============******")
+        print("user: \n", user_task)
+        print("=====================******")
         running_input = user_task
         process = {}
         running_input_log: list[dict[str, Any]] = []
@@ -188,22 +191,38 @@ class MultiAgentSystem:
 
                 if role.name == "judge":
                     parser = PydanticOutputParser(pydantic_object=JudgeOutput)
-                    parsed = _parse_with_async_support(parser, output)
+                    try:
+                        parsed = _parse_with_async_support(parser, output)
+                    except Exception as e:
+                        print("Error parsing judge output: ", e)
+                        parsed = parser.parse(output)
                     new_problem = parsed.new_problem
                     print("new_problem: ", new_problem)
                 elif role.name == "proof strategy planner":
                     parser = PydanticOutputParser(pydantic_object=PlannerOutput)
-                    parsed = _parse_with_async_support(parser, output)
+                    try:
+                        parsed = _parse_with_async_support(parser, output)
+                    except Exception as e:
+                        print("Error parsing planner output: ", e)
+                        parsed = parser.parse(output)
                     proof_sketch = parsed.proof_sketch
                     print("proof_sketch: ", proof_sketch)
                 elif role.name == "mathematician and proof writer":
                     parser = PydanticOutputParser(pydantic_object=MathematicianOutput)
-                    parsed = _parse_with_async_support(parser, output)
+                    try:
+                        parsed = _parse_with_async_support(parser, output)
+                    except Exception as e:
+                        print("Error parsing mathematician output: ", e)
+                        parsed = parser.parse(output)
                     detailed_proof = parsed.detailed_proof
                     print("detailed_proof: ", detailed_proof)
                 elif role.name == "final reviewer":
                     parser = PydanticOutputParser(pydantic_object=FinalReviewerOutput)
-                    parsed = _parse_with_async_support(parser, output)
+                    try:
+                        parsed = _parse_with_async_support(parser, output)
+                    except Exception as e:
+                        print("Error parsing final reviewer output: ", e)
+                        parsed = parser.parse(output)
                     end_of_proof = parsed.end_of_proof
                     print("end_of_proof: ", end_of_proof)
 
@@ -420,7 +439,7 @@ def main():
         max_rounds=6,
     )
 
-    for i in range(0, 50, 1):
+    for i in range(15, 50, 1):
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n")
         final_answer = system.run(task) 
