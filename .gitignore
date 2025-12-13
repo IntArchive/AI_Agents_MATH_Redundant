@@ -15,6 +15,9 @@ wheels/
 # log
 *.log
 
+# privacy
+config.yml
+
 # temporary files
 working/temp.ipynb
 *.swp
