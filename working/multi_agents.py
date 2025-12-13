@@ -23,7 +23,7 @@ import getpass
 import os
 from utils.dataloader import load_problem_column
 from utils import parsing
-from utils.parsing import PlannerOutput
+from utils.parsing import parse_json_from_text
 
 from pydantic import BaseModel
 from langchain.output_parsers import PydanticOutputParser
@@ -94,6 +94,10 @@ def extract_json_obj(text: str) -> dict:
     
     json_str = match.group(0)
     return json.loads(json_str)
+
+
+
+
 
 # add a safe python tool so the coder can run tiny snippets.
 python_repl = PythonREPLTool()
@@ -190,40 +194,20 @@ class MultiAgentSystem:
                         return parser.parse(text)
 
                 if role.name == "judge":
-                    parser = PydanticOutputParser(pydantic_object=JudgeOutput)
-                    try:
-                        parsed = _parse_with_async_support(parser, output)
-                    except Exception as e:
-                        print("Error parsing judge output: ", e)
-                        parsed = parser.parse(output)
-                    new_problem = parsed.new_problem
+                    parsed = parse_json_from_text(output)
+                    new_problem = parsed.get("new_problem")
                     print("new_problem: ", new_problem)
                 elif role.name == "proof strategy planner":
-                    parser = PydanticOutputParser(pydantic_object=PlannerOutput)
-                    try:
-                        parsed = _parse_with_async_support(parser, output)
-                    except Exception as e:
-                        print("Error parsing planner output: ", e)
-                        parsed = parser.parse(output)
-                    proof_sketch = parsed.proof_sketch
+                    parsed = parse_json_from_text(output)
+                    proof_sketch = parsed.get("proof_sketch")
                     print("proof_sketch: ", proof_sketch)
                 elif role.name == "mathematician and proof writer":
-                    parser = PydanticOutputParser(pydantic_object=MathematicianOutput)
-                    try:
-                        parsed = _parse_with_async_support(parser, output)
-                    except Exception as e:
-                        print("Error parsing mathematician output: ", e)
-                        parsed = parser.parse(output)
-                    detailed_proof = parsed.detailed_proof
+                    parsed = parse_json_from_text(output)
+                    detailed_proof = parsed.get("detailed_proof")
                     print("detailed_proof: ", detailed_proof)
                 elif role.name == "final reviewer":
-                    parser = PydanticOutputParser(pydantic_object=FinalReviewerOutput)
-                    try:
-                        parsed = _parse_with_async_support(parser, output)
-                    except Exception as e:
-                        print("Error parsing final reviewer output: ", e)
-                        parsed = parser.parse(output)
-                    end_of_proof = parsed.end_of_proof
+                    parsed = parse_json_from_text(output)
+                    end_of_proof = parsed.get("end_of_proof")
                     print("end_of_proof: ", end_of_proof)
 
                     
@@ -318,7 +302,16 @@ def main():
     data["mathematician and proof writer"] = ""
     data["final reviewer"] = ""
     problem_column = load_problem_column(config.file_path, config.target_problem_col)
-    num_tasks = 20
+    # using argparse to load the id_from and id_to
+
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--id_from', type=int, default=0)
+    parser.add_argument('--id_to', type=int, default=0)
+    args = parser.parse_args()
+    id_from = args.id_from
+    id_to = args.id_to
+   
     
 
     llm_deepseek = ChatDeepSeek(
@@ -407,8 +400,8 @@ def main():
         goal="Read the new problem and the proof sketch and write a detailed proof for those subgoals in proof sketch, note that write new_problem as what you were given and write complete detailed_proof carefully follow the JSON structure or JSON object as mentioned in guidelines.",
         guidelines=(
             "Guideline_1: Output your answer as a JSON object with keys:'new_problem', 'detailed_proof'. "
-            "Guideline_2: follow the plan from shared notes, write a complete proof. "
             + parser3.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
+            # "Guideline_2: follow the plan from shared notes, write a complete proof. "
         ),
         tools=[python_repl, save_note, read_notes],
     )
@@ -439,7 +432,7 @@ def main():
         max_rounds=6,
     )
 
-    for i in range(15, 50, 1):
+    for i in range(id_from, id_to, 1):
         task = problem_column.iloc[i]
         print(f"\n\n=========================== TASK {i} ===================================\n")
         final_answer = system.run(task) 
