@@ -9,9 +9,9 @@ import re
 # 2. filedatthem_gtdu: filename should be <filename_to_check>_them_gtdu.xlsx
 # command to run this file: 
 COMMAND = """
-python 2_Numerical_order_of_Assumption.py \
---filechuakiemtra_originalproblem "/Users/macos/Documents/Research/NCKH_2025/Redundant_Assumption_Project/Task/2_Numerically_define_assumption/math_stack_exchange_11k_filter_noContent_noAcceptedAnswer_0to8332_them_gtdu_remain3439samples_error_free_originalproblem.xlsx" \
---filedatthem_gtdu_without_extension "./math_stack_exchange_11k_filter_noContent_noAcceptedAnswer_0to8332_them_gtdu_remain3439samples_error_free"
+python ./utils/2_Numerical_order_of_Assumption.py \
+--filechuakiemtra_originalproblem "/home/haidm/Documents/My_git/AI_Agents_MATH_Redundant/working/data/math_stack_exchange_11k_filter_noContent_noAcceptedAnswer_0to8332_them_gtdu_remain3439samples_error_freedanhsogiathietplusredundant_assumption_with_numerical_order.xlsx" \
+--filedatthem_gtdu_without_extension "./data/donedataset"
 """
 
 # Example: python ./pipeline/2_kiemtra_OriginalProblem_va_Them_GT_du.py --filechuakiemtra_originalproblem "./data1600to2000Original_Problem_created_redundant_assumption.xlsx" --filedatthem_gtdu_without_extension "./data1600to2000Original_Problem_created_redundant_assumption_them_gtdu"
