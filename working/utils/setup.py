@@ -12,6 +12,16 @@ def setup():
 
     return config
 
+def setup_WITHOUT_RA():
+    config = OmegaConf.load(Path('./config_WITHOUT_RA.yml'))
+    if not os.environ.get("DEEPSEEK_API_KEY"):
+        os.environ["DEEPSEEK_API_KEY"] = config.deepseek_api
+    
+    if not os.environ.get("GOOGLE_API_KEY"):
+        os.environ["GOOGLE_API_KEY"] = config.gemini_api
+
+    return config
+
 
 
 

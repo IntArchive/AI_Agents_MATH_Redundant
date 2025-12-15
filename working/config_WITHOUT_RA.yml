@@ -1,0 +1,5 @@
+deepseek_api: "sk-dd63f7052da3415ba905d650b50f89aa"
+gemini_api: "AIzaSyBhoEZG3wayAmVfjyxKfZPyO1SXNRkRIHY"
+file_path: "./data/dataset_for_WITHOUT_RA.xlsx"
+save_path: "./data/Prob_WITHOUT_RA"
+target_problem_col: "Original_Problem_with_numerical_assumption" # "Problem_with_redundant_assumption"

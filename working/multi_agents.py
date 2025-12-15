@@ -23,7 +23,7 @@ import getpass
 import os
 from utils.dataloader import load_problem_column
 from utils import parsing
-from utils.parsing import parse_json_from_text, parse_from_text
+from utils.parsing import parse_json_from_text, parse_from_text, repair_json_backslashes, repair_json
 
 from pydantic import BaseModel
 from langchain.output_parsers import PydanticOutputParser
@@ -50,6 +50,7 @@ class MathematicianOutput(BaseModel):
 
 class FinalReviewerOutput(BaseModel):
     proof_review: Optional[bool] = None
+    clear_answer: Optional[str] = "yes"
     finished: Optional[str] = "no"
 # ---------- tools ----------
 # (you can add more tools later. keep them simple to start.)
@@ -163,6 +164,8 @@ class MultiAgentSystem:
         proof_sketch: str = ""
         detailed_proof: str = ""
         finished: str = "no"
+        clear_answer: str = "yes"
+        rda: str = ""
         for round_idx in range(1, self.max_rounds + 1):
             for role in self.roles:
                 # assemble a short context window from the transcript
@@ -197,7 +200,12 @@ class MultiAgentSystem:
                     f.write("\n")
                 if role.name == "judge":
                     parser = parse_json_from_text(output, mode="new_problem")
-                    problem = "Prove that " + parser.get("redundant_assumption") if "Assumption" not in parser.get("redundant_assumption") else "Prove that " + parser.get("redundant_assumption")[13:].strip()
+                    try: 
+                        rda = parser.get("redundant_assumption")
+                    except Exception as e:
+                        parser = repair_json(output, ["assumptions", "redundant_assumption"])
+                        rda = parser.get("redundant_assumption")
+                    problem = "Prove that " + rda if "Assumption" not in rda else "Prove that " + rda[13:].strip()
                     new_problem = "Assumption:\n" + "\n".join([f"Assumption {i+1}: {assumption}" for i, assumption in enumerate(parser.get("assumptions"))]) + "\nProblem:\n" + problem
                     print("new_problem: ", new_problem)
                     if new_problem is None:
@@ -234,10 +242,13 @@ class MultiAgentSystem:
                 elif role.name == "final reviewer":
                     parser = parse_json_from_text(output, mode="finished")
                     finished = parser.get("finished")
+                    clear_answer = parser.get("clear_answer")
                     print("finished: ", finished)
                     if finished is None:
                         finished = output
                         print("finished: ", finished)
+                        clear_answer = "yes"
+                        print("clear_answer: ", clear_answer)
                     
 
                     
@@ -310,7 +321,7 @@ class MultiAgentSystem:
 
                 # stop condition
                 for line in output.splitlines():
-                    if finished.strip().lower() == "yes":
+                    if finished.strip().lower() == "yes" and clear_answer.strip().lower() == "yes":
                         running_input_log.insert(0, {"user": user_task})
                         with open("running_input_Prob_WITHOUT_RA.json", "a", encoding="utf-8") as f:
                             json.dump(running_input_log, f, ensure_ascii=False, indent=4)
@@ -318,6 +329,15 @@ class MultiAgentSystem:
                         process["__transcript__"] = self.transcript
                         process["__running_log__"] = running_input_log
                         return process 
+                    elif finished.strip().lower() == "no" and clear_answer.strip().lower() == "yes" or (finished.strip().lower() == "no" and clear_answer.strip().lower() == "no"):
+                        continue
+                    elif (finished.strip().lower() == "yes" and clear_answer.strip().lower() == "no"):
+                        return {
+                            "error": "The proof is not clear.",
+                            "__transcript__": self.transcript,
+                            "__running_log__": running_input_log,
+                        }
+                    
         # if nobody concluded with final:
         return {
             "error": "no agent produced a final answer within the round limit.",
@@ -451,9 +471,9 @@ def main():
     reviewer = build_agent(
         llm=llm_gemini_2,
         name="final reviewer",
-        goal="check correctness of the proof; write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines then present the clean, final result.",
+        goal="If the proof are clear. Check correctness of the proof; write carefully down answers follow the JSON structure or JSON object as mentioned in guidelines then present the clean, final result. Otherwise, output clear_answer: 'no' and finished: 'yes'.",
         guidelines=(
-            "Guideline_1: Output your answer as a JSON object with keys:'proof_review' (<True> or <False>), 'finished' (<yes> or <no>)'. "
+            "Guideline_1: Output your answer as a JSON object with keys:'proof_review' (<True> or <False>), 'finished' (<yes> or <no>)', 'clear_answer' (<yes> or <no>). "
             # "Guideline_2: read shared notes, verify the proof from mathematician and proof writer , and only conclude when satisfied (follow the format 'Proof: <True/False>). "
             # "Guideline_3: the final line must start with 'proof:' followed by the final answer."
             # "Guideline_5: After reviewing the proof, if it is correct, output the final answer and the original problem without redundant assumption. Then output 'final:'"
@@ -521,11 +541,11 @@ def main():
             os.mkdir(Path(save_path))
 
         # Save per-task result
-        with open(Path(f"{save_path}/result_task_{i}.json"), "w", encoding="utf-8") as f_json:
+        with open(Path(f"{save_path}/result_task_{(4 - len(str(i))) * '0' + str(i)}.json"), "w", encoding="utf-8") as f_json:
             f_json.write(row_json)
 
         # Save per-task conversation log (user, judge, planner, mathematician, reviewer)
-        with open(Path(f"{save_path}/conversation_task_{i}.json"), "w", encoding="utf-8") as f_conv:
+        with open(Path(f"{save_path}/conversation_task_{(4 - len(str(i))) * '0' + str(i)}.json"), "w", encoding="utf-8") as f_conv:
             json.dump(
                 {
                     "task_index": i,

@@ -38,8 +38,8 @@ def parse_json_from_text(text, mode:str = "proof_sketch"):
     """
     # Pattern to match ```json ... ``` blocks
     # The pattern uses non-greedy matching (.*?) to capture the JSON content
-    pattern1 = r'(```json\s*(.*?)\s*```)'
-    pattern2 = r'(###BEGIN_OF_FORMAT###\s*([\s\S]*?)\s*\n###END_OF_FORMAT###)'
+    pattern1 = r'(```json\s*([\s\S]*?)\s*```)'
+    pattern2 = r'(###BEGIN_OF_FORMAT###\s*([\s\S]*?)\s*###END_OF_FORMAT###)'
     # Find all matches (in case there are multiple JSON blocks)
     matches = re.search(pattern1, text, re.DOTALL)
     if not matches:
@@ -50,6 +50,7 @@ def parse_json_from_text(text, mode:str = "proof_sketch"):
     
     # Get the first match (or you could return all matches if needed)
     # Check which alternative matched: group(2) for ```json``` or group(4) for ###BEGIN_OF_FORMAT###
+    print("matches :", matches)
     json_str = matches.group(2) if matches.group(2) is not None else matches.group(4)
     if json_str is None:
         return None
@@ -90,11 +91,11 @@ def parse_from_text(text, mode:str = "proof_sketch"):
         pattern1 = r'(```json\s*([\s\S]*?)\s*```)'
 
     if mode == "new_problem":
-        pattern2 = r'(###BEGIN_OF_FORMAT###\s*New problem:\s*([\s\S]*?)\s*###)|(###BEGIN_OF_FORMAT###\s*([\s\S]*?)\s*\n###END_OF_FORMAT###)'
+        pattern2 = r'(###BEGIN_OF_FORMAT###\s*New problem:\s*([\s\S]*?)\s*###)|(###BEGIN_OF_FORMAT###\s*([\s\S]*?)\s*###END_OF_FORMAT###)'
     elif mode == "proof_sketch":
-        pattern2 = r'(###BEGIN_OF_FORMAT###\s*Proof sketch:\s*([\s\S]*?)\s*###)|(###BEGIN_OF_FORMAT###\s*([\s\S]*?)\s*\n###END_OF_FORMAT###)'
+        pattern2 = r'(###BEGIN_OF_FORMAT###\s*Proof sketch:\s*([\s\S]*?)\s*###)|(###BEGIN_OF_FORMAT###\s*([\s\S]*?)\s*###END_OF_FORMAT###)'
     elif mode == "detailed_proof":
-        pattern2 = r'(###BEGIN_OF_FORMAT###\s*Detailed proof:\s*([\s\S]*?)\s*###)|(###BEGIN_OF_FORMAT###\s*([\s\S]*?)\s*\n###END_OF_FORMAT###)'
+        pattern2 = r'(###BEGIN_OF_FORMAT###\s*Detailed proof:\s*([\s\S]*?)\s*###)|(###BEGIN_OF_FORMAT###\s*([\s\S]*?)\s*###END_OF_FORMAT###)'
     else:
         raise ValueError(f"Invalid mode: {mode}")
     
@@ -111,6 +112,8 @@ def parse_from_text(text, mode:str = "proof_sketch"):
         return content
     else:
         content = matches.group(2).strip()
+        print("content = matches.group(2).strip(): ", content)
+        content = json.dumps(content)
         content = json.loads(content)
         if mode == "new_problem":
             return content.get("new_problem")
@@ -126,6 +129,79 @@ def parse_from_text(text, mode:str = "proof_sketch"):
     # Get the first match (or you could return all matches if needed)
     # Check which alternative matched: group(2) for first pattern or group(4) for second pattern
     
+def repair_json_backslashes(json_text: str) -> str:
+    r"""
+    Sửa JSON có backslash bậy trong string (LaTeX/regex/path):
+    - Trong string JSON: chỉ giữ các escape an toàn: \", \\, \/, \uXXXX
+    - Còn lại (vd \lambda, \det, \begin, \d, \s, ...) -> biến thành literal bằng cách thêm 1 backslash.
+    - Đồng thời escape các control char thật (newline/tab/CR) nếu lỡ nằm trong string.
+    """
+    out = []
+    i = 0
+    in_str = False
+
+    while i < len(json_text):
+        ch = json_text[i]
+
+        if not in_str:
+            out.append(ch)
+            if ch == '"':
+                in_str = True
+            i += 1
+            continue
+
+        # inside a JSON string
+        if ch == '"':
+            out.append(ch)
+            in_str = False
+            i += 1
+            continue
+
+        if ch == '\\':
+            if i + 1 >= len(json_text):
+                out.append('\\\\')
+                i += 1
+                continue
+
+            nxt = json_text[i + 1]
+
+            # safe escapes
+            if nxt in ['"', '\\', '/']:
+                out.append('\\' + nxt)
+                i += 2
+                continue
+
+            if nxt == 'u':
+                hexpart = json_text[i + 2:i + 6]
+                if len(hexpart) == 4 and all(c in string.hexdigits for c in hexpart):
+                    out.append('\\u' + hexpart)
+                    i += 6
+                    continue
+
+            # otherwise: make the backslash literal
+            out.append('\\\\')
+            i += 1
+            continue
+
+        # escape literal control chars inside string
+        if ch == '\n':
+            out.append('\\n'); i += 1; continue
+        if ch == '\r':
+            out.append('\\r'); i += 1; continue
+        if ch == '\t':
+            out.append('\\t'); i += 1; continue
+
+        out.append(ch)
+        i += 1
+
+    return ''.join(out)
+
     
-    
-    
+
+def repair_json(text: str, key: list[str]) -> str:
+    d = dict()
+    for k in key:
+        pos = text.find(k)
+        end = text.find('\n', pos)
+        d[k] = text[pos + len(k) + 3: end]
+    return d
