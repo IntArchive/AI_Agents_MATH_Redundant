@@ -12,8 +12,6 @@ wheels/
 # Virtual environments
 .venv
 
-# log
-*.log
 
 # privacy
 config.yml
