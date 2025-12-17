@@ -37,6 +37,7 @@ class JudgeOutput(BaseModel):
     answer_to_Q1: str = ""
     assumptions: Optional[List[str]] = None
     redundant_assumption: Optional[str] = None
+    redundant_assumption_number: Optional[int] = None
     new_problem: Optional[str] = None
     solution_for_new_problem: Optional[str] = None
 
@@ -166,6 +167,8 @@ class MultiAgentSystem:
         finished: str = "no"
         clear_answer: str = "yes"
         rda: str = ""
+        redundant_assumption_number: str = "10000"
+        proof_review: str = ""
         for round_idx in range(1, self.max_rounds + 1):
             for role in self.roles:
                 # assemble a short context window from the transcript
@@ -195,19 +198,24 @@ class MultiAgentSystem:
                         return parser.parse(text)
                 
 
-                with open("running_input_test.json", "a", encoding="utf-8") as f:
-                    json.dump({"role": role.name, "running_input": running_input, "output": output}, f, ensure_ascii=False, indent=4)
-                    f.write("\n")
+                # with open("running_input_test.json", "a", encoding="utf-8") as f:
+                #     json.dump({"role": role.name, "running_input": running_input, "output": output}, f, ensure_ascii=False, indent=4)
+                #     f.write("\n")
                 if role.name == "judge":
                     parser = parse_json_from_text(output, mode="new_problem")
                     try: 
                         rda = parser.get("redundant_assumption")
+                        redundant_assumption_number = parser.get("redundant_assumption_number")
                     except Exception as e:
                         parser = repair_json(output, ["assumptions", "redundant_assumption"])
                         rda = parser.get("redundant_assumption")
-                    problem = "Prove that " + rda if "Assumption" not in rda else "Prove that " + rda[13:].strip()
-                    new_problem = "Assumption:\n" + "\n".join([f"Assumption {i+1}: {assumption}" for i, assumption in enumerate(parser.get("assumptions"))]) + "\nProblem:\n" + problem
-                    print("new_problem: ", new_problem)
+                        redundant_assumption_number = parser.get("redundant_assumption_number")
+                    if rda is not None:
+                        problem = "Prove that " + rda if "Assumption" not in rda else "Prove that " + rda[13:].strip()
+                        new_problem = "Assumption:\n" + "\n".join([f"Assumption {i+1}: {assumption}" for i, assumption in enumerate(parser.get("assumptions"))]) + "\nProblem:\n" + problem
+                        print("new_problem: ", new_problem)
+                    else:
+                        new_problem = "The problem doesn't have redundant assumptions. Then we don't have new_problem"
                     if new_problem is None:
                         try:
                             new_problem = parse_from_text(output, mode="new_problem")
@@ -241,6 +249,7 @@ class MultiAgentSystem:
                         
                 elif role.name == "final reviewer":
                     parser = parse_json_from_text(output, mode="finished")
+                    proof_review = parser.get("proof_review")
                     finished = parser.get("finished")
                     clear_answer = parser.get("clear_answer")
                     print("finished: ", finished)
@@ -312,6 +321,10 @@ class MultiAgentSystem:
                         "role": role.name,
                         "output": output,
                         "running_input": running_input,
+                        "redundant_assumption_number": redundant_assumption_number,
+                        "predicted_redundant_assumption": rda,
+                        "proof_review": proof_review,
+                        "clear_answer": clear_answer,
                     }
                 )
 
@@ -353,6 +366,8 @@ def main():
     data["proof strategy planner"] = ""
     data["mathematician and proof writer"] = ""
     data["final reviewer"] = ""
+    data["predicted_redundant_assumption"] = ""
+    data["redundant_assumption_number"] = "10000"
     problem_column = load_problem_column(config.file_path, config.target_problem_col)
     # using argparse to load the id_from and id_to
 
@@ -421,10 +436,9 @@ def main():
     ###END_OF_FORMAT###
     """,
         guidelines=(
-            "Guideline_1: Answer the question Q1 using the format 'answer_to_Q1'. "
-            "Guideline_2: If there is a redundant assumption, output your answer as a JSON object with keys: 'answer_to_Q1', 'assumptions' (without redundant assumption), 'redundant_assumption', 'new_problem', 'solution_for_new_problem'. "
-            "Guideline_3: If there is not a redundant assumption, output JSON with 'answer_to_Q1', 'assumptions', 'redundant_assumption: no', 'new_problem: no' and 'solution_for_new_problem: no'. "
-            "Guideline_4: Store the plan via save_note, then hand off succinctly. "
+            "Guideline_1: If there is a redundant assumption, output your answer as a JSON object with keys: 'answer_to_Q1', 'assumptions' (without redundant assumption), 'redundant_assumption', 'redundant_assumption_number', 'new_problem', 'solution_for_new_problem'. "
+            "Guideline_2: If there is not a redundant assumption, output JSON with 'answer_to_21', 'assumptions', 'redundant_assumption: no', 'redundant_assumption_number: no', 'new_problem: no' and 'solution_for_new_problem: no'. "
+            "Guideline_3: Store the plan via save_note, then hand off succinctly. "
             + parser1.get_format_instructions().replace("{", "{{").replace("}", "}}")  # <-- This tells the LLM how to format its output
         ),
         tools=[save_note, read_notes],
@@ -528,10 +542,15 @@ def main():
         data.at[i, "proof strategy planner"] = role_contexts.get("proof strategy planner", "")
         data.at[i, "mathematician and proof writer"] = role_contexts.get("mathematician and proof writer", "")
         data.at[i, "final reviewer"] = role_contexts.get("final reviewer", "")
-        if "Redundant Assumption:" in str(final_answer):
-            # print("Here -------------")
-            redundant_assumption = str(final_answer).split("Redundant Assumption:")[-1].strip()
-            data.at[i, "Redundant_assumption"] = redundant_assumption
+
+        data.at[i, "predicted_redundant_assumption"] = running_log[-1].get("predicted_redundant_assumption", "")
+        data.at[i, "redundant_assumption_number"] = running_log[-1].get("redundant_assumption_number", "10000")
+        data.at[i, "proof_review"] = running_log[-1].get("proof_review", "")
+        data.at[i, "clear_answer"] = running_log[-1].get("clear_answer", "")
+        # if "Redundant Assumption:" in str(final_answer):
+        #     # print("Here -------------")
+        #     redundant_assumption = str(final_answer).split("Redundant Assumption:")[-1].strip()
+        #     data.at[i, "Redundant_assumption"] = redundant_assumption
         # Save the current row as JSON for inspection
         row_json = data.iloc[i].to_json(force_ascii=False, indent=4)
 

@@ -168,6 +168,7 @@ class MultiAgentSystem:
         clear_answer: str = "yes"
         rda: str = ""
         redundant_assumption_number: str = "10000"
+        proof_review: str = ""
         for round_idx in range(1, self.max_rounds + 1):
             for role in self.roles:
                 # assemble a short context window from the transcript
@@ -209,9 +210,12 @@ class MultiAgentSystem:
                         parser = repair_json(output, ["assumptions", "redundant_assumption"])
                         rda = parser.get("redundant_assumption")
                         redundant_assumption_number = parser.get("redundant_assumption_number")
-                    problem = "Prove that " + rda if "Assumption" not in rda else "Prove that " + rda[13:].strip()
-                    new_problem = "Assumption:\n" + "\n".join([f"Assumption {i+1}: {assumption}" for i, assumption in enumerate(parser.get("assumptions"))]) + "\nProblem:\n" + problem
-                    print("new_problem: ", new_problem)
+                    if rda is not None:
+                        problem = "Prove that " + rda if "Assumption" not in rda else "Prove that " + rda[13:].strip()
+                        new_problem = "Assumption:\n" + "\n".join([f"Assumption {i+1}: {assumption}" for i, assumption in enumerate(parser.get("assumptions"))]) + "\nProblem:\n" + problem
+                        print("new_problem: ", new_problem)
+                    else:
+                        new_problem = "The problem doesn't have redundant assumptions. Then we don't have new_problem"
                     if new_problem is None:
                         try:
                             new_problem = parse_from_text(output, mode="new_problem")
@@ -245,6 +249,7 @@ class MultiAgentSystem:
                         
                 elif role.name == "final reviewer":
                     parser = parse_json_from_text(output, mode="finished")
+                    proof_review = parser.get("proof_review")
                     finished = parser.get("finished")
                     clear_answer = parser.get("clear_answer")
                     print("finished: ", finished)
@@ -318,6 +323,8 @@ class MultiAgentSystem:
                         "running_input": running_input,
                         "redundant_assumption_number": redundant_assumption_number,
                         "predicted_redundant_assumption": rda,
+                        "proof_review": proof_review,
+                        "clear_answer": clear_answer,
                     }
                 )
 
@@ -538,7 +545,8 @@ def main():
 
         data.at[i, "predicted_redundant_assumption"] = running_log[-1].get("predicted_redundant_assumption", "")
         data.at[i, "redundant_assumption_number"] = running_log[-1].get("redundant_assumption_number", "10000")
-
+        data.at[i, "proof_review"] = running_log[-1].get("proof_review", "")
+        data.at[i, "clear_answer"] = running_log[-1].get("clear_answer", "")
         # if "Redundant Assumption:" in str(final_answer):
         #     # print("Here -------------")
         #     redundant_assumption = str(final_answer).split("Redundant Assumption:")[-1].strip()
