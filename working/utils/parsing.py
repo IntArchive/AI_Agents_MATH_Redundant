@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from typing import List, Optional
-from langchain.output_parsers import PydanticOutputParser
+from langchain_classic.output_parsers import PydanticOutputParser
 import re
 import json
 

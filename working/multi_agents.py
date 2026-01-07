@@ -14,7 +14,7 @@ from langchain_openai import ChatOpenAI
 from langchain_deepseek import ChatDeepSeek
 from langchain.tools import tool
 from langchain_experimental.tools.python.tool import PythonREPLTool
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.prompts import ChatPromptTemplate
 from langchain.agents import create_tool_calling_agent, AgentExecutor
 from langchain_google_genai import ChatGoogleGenerativeAI
 from utils import setup
