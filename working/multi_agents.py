@@ -15,18 +15,18 @@ from langchain_deepseek import ChatDeepSeek
 from langchain.tools import tool
 from langchain_experimental.tools.python.tool import PythonREPLTool
 from langchain_core.prompts import ChatPromptTemplate
-from langchain.agents import create_tool_calling_agent, AgentExecutor
+from langchain_classic.agents import create_tool_calling_agent, AgentExecutor
 from langchain_google_genai import ChatGoogleGenerativeAI
 from utils import setup
 from utils.struc_output import struct_out  
 import getpass
 import os
-from utils.dataloader import load_problem_column
+from utils.dataloader import load_problem_column, load_data
 from utils import parsing
 from utils.parsing import parse_json_from_text, parse_from_text, repair_json_backslashes, repair_json
 
 from pydantic import BaseModel
-from langchain.output_parsers import PydanticOutputParser
+from langchain_classic.output_parsers import PydanticOutputParser
 import re
 import json
 # import os
@@ -361,7 +361,7 @@ class MultiAgentSystem:
 def main():    
     config = setup.setup()
     save_path = config.save_path
-    data = pd.read_excel(config.file_path)
+    data = load_data(config.file_path)
     data["judge"] = ""
     data["proof strategy planner"] = ""
     data["mathematician and proof writer"] = ""
