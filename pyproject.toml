@@ -5,7 +5,13 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
+    "debugpy>=1.8.19",
+    "google-api-core==2.25.1",
+    "grpc-google-iam-v1==0.13.0",
+    "grpcio==1.73.1",
+    "grpcio-status==1.48.2",
     "langchain>=0.3.27",
+    "langchain-community>=0.4.1",
     "langchain-deepseek>=0.1.4",
     "langchain-experimental>=0.3.4",
     "langchain-google-genai>=2.1.11",
