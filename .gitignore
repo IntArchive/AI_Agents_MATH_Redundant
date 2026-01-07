@@ -12,6 +12,9 @@ wheels/
 # vscode-generated files
 .vscode/
 
+# Temporary files from LibreOffice
+working/data/.~*
+
 # Virtual environments
 .venv
 
