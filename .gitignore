@@ -25,3 +25,9 @@ config.yml
 # temporary files
 working/temp.ipynb
 *.swp
+
+# Folder data
+working/data/
+working/data/temporary/
+working/data/donedataset/
+working/data/numberofassumption_and_Groundtruth_redundant_assumption_number/
