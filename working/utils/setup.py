@@ -10,6 +10,15 @@ def setup():
     if not os.environ.get("GOOGLE_API_KEY"):
         os.environ["GOOGLE_API_KEY"] = config.gemini_api
 
+    if not os.environ.get("QWEN_API_KEY"):
+        os.environ["QWEN_API_KEY"] = config.deepinfra_api
+
+    if not os.environ.get("OPENAI_API_KEY"):
+        os.environ["OPENAI_API_KEY"] = config.openai_api
+ 
+    if not os.environ.get("DEEPINFRA_API_KEY"):
+        os.environ["DEEPINFRA_API_KEY"] = config.deepinfra_api
+
     return config
 
 

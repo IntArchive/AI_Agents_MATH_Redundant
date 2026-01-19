@@ -315,7 +315,7 @@ def main():
     # )
 
     reviewer = build_agent(
-        llm=llm_gemini_2,
+        llm=,
         name="final reviewer",
         goal="check correctness of the proof; then present the clean, final result.",
         guidelines=(
