@@ -380,6 +380,7 @@ def parse_args():
 def main():    
     args = parse_args()
 
+    config = setup.setup()
     data = load_data(args.file_path)
     save_path = args.save_path
     data["judge"] = ""
