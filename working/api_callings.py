@@ -485,7 +485,6 @@ def main():
             else:
                 os.mkdir(Path(save_path))
             # Save respond to the result_task_{index}.json
-            print(response,file=open("response.txt", "a"))
             response = preprocess_text(response)
             answer = output_format_as_json_object(response, ["Answer", "Ordinal number of redundant assumption", "Redundant assumption", "Your explanation"])
             with open(f"{save_path}/{args.llm}_{args.mode}_result_task_{(4 - len(str(index))) * '0' + str(index)}.json", "w", encoding="utf-8") as f:

@@ -336,8 +336,6 @@ class MultiAgentSystem:
                 for line in output.splitlines():
                     if finished.strip().lower() == "yes" and clear_answer.strip().lower() == "yes":
                         running_input_log.insert(0, {"user": user_task})
-                        with open("running_input_Prob_WITHOUT_RA.json", "a", encoding="utf-8") as f:
-                            json.dump(running_input_log, f, ensure_ascii=False, indent=4)
                         # attach conversation logs so caller can persist them
                         process["__transcript__"] = self.transcript
                         process["__running_log__"] = running_input_log
