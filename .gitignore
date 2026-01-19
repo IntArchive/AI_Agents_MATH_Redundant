@@ -19,3 +19,6 @@ config.yml
 working/asset/
 
 working/temp.ipynb
+
+working/data/
+.vscode/
