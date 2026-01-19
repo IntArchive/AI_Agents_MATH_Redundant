@@ -4,9 +4,7 @@
 from typing import List, Dict, Any, Union, Optional
 from pathlib import Path
 import os
-import sys
 from dataclasses import dataclass
-import asyncio
 from openai import OpenAI
 import pandas as pd
 
@@ -107,14 +105,12 @@ def extract_json_obj(text: str) -> dict:
     return json.loads(json_str)
 
 
-
-
 # ---------- agent factory ----------
 def build_agent(
     llm: Union[ChatDeepSeek, ChatOpenAI],
     name: str,
     goal: str,
-        guidelines: str,
+    guidelines: str,
     tools: list,
 ) -> tuple[AgentExecutor, str]:
     """create a tool-calling agent with a role-specific system prompt."""
@@ -135,9 +131,7 @@ general rules:
     )
     agent = create_tool_calling_agent(llm=llm, tools=tools, prompt=prompt)
     return AgentExecutor(agent=agent, tools=tools, verbose=False, handle_parsing_errors=True), system
-
-
-        
+  
 # ---------- orchestrator ----------
 @dataclass
 class role:
@@ -169,7 +163,6 @@ class MultiAgentSystem:
         new_problem: str = ""
         proof_sketch: str = ""
         detailed_proof: str = ""
-        rda: str = ""
         ordinal_number_of_redundant_assumption: Union[str, int] = "10000"
         proof_review: str = ""
         
@@ -184,8 +177,6 @@ class MultiAgentSystem:
                 result = role.executor.invoke({"input": context})
                 process[role.name] = result["output"]
                 output = result["output"]
-                with open("output.txt", "a", encoding="utf-8") as f:
-                    f.write(output + "\n")
 
                 if role.name == "judge":
                     parser = output_format_as_json_object(output, ["Answer to Q1", "Redundant assumption", "Assumptions", "Ordinal number of redundant assumption"])
@@ -380,8 +371,6 @@ def parse_args():
 def main():
     # Parse command line arguments
     args = parse_args()
-    config = setup.setup()
-
     # Load data
     data = load_data(args.file_path)
     data["judge"] = ""
