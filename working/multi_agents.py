@@ -341,8 +341,6 @@ def main():
         print(f"\n\n=========================== TASK {i} ===================================\n" + task)
         final_answer = system.run(task)
         data.at[i, "judge"] = final_answer.get("judge", "")
-        data.at[i, "proof strategy planner"] = final_answer.get("proof strategy planner", "")
-        data.at[i, "mathematician and proof writer"] = final_answer.get("mathematician and proof writer", "")
         data.at[i, "final reviewer"] = final_answer.get("final reviewer", "")
         if "Redundant Assumption:" in final_answer:
             print("Here -------------")
