@@ -12,22 +12,31 @@ from utils import setup
 from utils.dataloader import load_data
 import json
 from pathlib import Path
+import re
 
 
 COMMAND_TO_RUN = """
-python ./working/api_callings.py \
+python working/api_callings.py \
 --llm deepseek-chat \
 --mode non-thinking \
---data_path "./working/data/Second_data.ods" \
---prompt_column1 "Original_Problem" \
---prompt_column2 "AcceptedAnswer" \
---response_column "Important_Result" \
---save_path "./working/data/take_redundant_assumption" \
+--data_path "./working/data/data200.xlsx" \
+--prompt_column1 "Problem_with_redundant_assumption" \
+--save_path "./working/data/Task1_PRWITHRA" \
 --id_from 0 \
---id_to 10 \
+--id_to 50 \
 --temperature 0 \
 --max-retries 2
 
+python working/api_callings.py \
+--llm deepseek-chat \
+--mode non-thinking \
+--data_path "./working/data/data200.xlsx" \
+--prompt_column1 "Original_Problem_with_numerical_assumption" \
+--save_path "./working/data/Task1_PRWITHOUTRA" \
+--id_from 21 \
+--id_to 30 \
+--temperature 0 \
+--max-retries 2
 
 python ./working/api_callings.py \
 --llm gemini-2.5-pro \
@@ -43,18 +52,156 @@ python ./working/api_callings.py --llm gemini-3.0-pro --mode thinking --prompt "
 python ./working/api_callings.py --llm deepseek-reasoner --mode thinking --prompt "What is the capital of France?"
 """
 
+
+SYSTEM_MESSAGE = """
+Act as a direct, efficient, knowledgeable, and English mathematics 
+professor. Your task is to read the structured mathematics problem and 
+answer the following question.
+
+Question: Does this problem have redundant assumption?
+
+To answer the question, you must follow the format below:
+###BEGIN_OF_FORMAT###
+Answer: <yes/no> 
+
+Ordinal number of redundant assumption: 
+<If the problem has a redundant assumption, write the ordinal number of redundant assumption, which is the same as the ordinal number of assumption in the problem. If the problem does not have a redundant assumption, write -1> 
+
+Redundant assumption: 
+<If the problem has a redundant assumption, write the redundant assumption here, write the same as assumption the problem
+has. If the problem does not have a redundant assumption, write "no"> 
+
+Your explanation: 
+<if you suppose the problem has at least one redundant assumption, your explanation must include a solution (start the proof with **PROOF**) for the problem which don't use the redundant assumption. If the problem does not have a redundant assumption, your explanation must be "The problem does not have a redundant assumption.">
+###END_OF_FORMAT###
+
+"""
+# """
+# Act as a direct, efficient, knowledgeable, and English mathematics professor. Your task is to read the definition to understand the concept of non-trivial redundant assumption and then read the structured mathematics problem and 
+# answer the following question.
+
+# # 1.Definition of non-trivial redundant assumption:
+# A non-trivial redundant assumption (we will call TYPE_NON_TRIVIAL_REDUNDANT_ASSUMPTION) is an assumption that is not necessary to prove the theorem (we can indicate it as redundant assumption by create a proof for the problem without using that assumption) or unapparent result which can be proved by using the other assumptions.
+# For example: Consider the following problem:
+# Original problem is
+# Assumption:
+# Assumption 1: $a\in\mathbb{Z}$ 
+# Assumption 2: $3\mid a$
+# Assumption 3: $2\mid a$
+# Problem: Prove that $6 \mid (a^2 + a)$.
+
+# One student can solve the problem by using the following proof:
+# Student's Proof:
+# Since $2\mid a$ and $3\mid a$, we have $6\mid a$. Then, $6 \mid a^2$ and $6 \mid a$.
+# Therefore, $6 \mid (a^2 + a)$.
+# This student proof for this problem is correct but it uses the assumption $2\mid a$. The using the assumption $2\mid a$ is not necessary to prove the problem. Indeed the assumption $2\mid a$ is actually redundant because $a^2 + a = a(a+1)$ is the product of two consecutive numbers which is divisible by $2$. So we can create and prove a new problem which is equivalent to the original problem but without using the assumption $2\mid a$.
+# New problem is
+# Assumption:
+# Assumption 1: $a\in\mathbb{Z}$ 
+# Assumption 2: $3\mid a$
+# Problem: Prove that $6 \mid (a^2 + a)$.
+
+# New proof:
+# Since $3\mid a$, we have $3\mid a^2 + a$. Besides, $a^2 + a = a(a+1)$ is the product of two consecutive numbers which is divisible by $2$. Therefore, $6 \mid (a^2 + a)$.
+# This new proof for this new problem which is equivalent to the original problem but without the assumption $2\mid a$ is correct. So the assumption $2\mid a$ is actually redundant.
+
+
+# # 2.Definition of non-redundant assumption:
+# There are some assumptions that we usually consider them as trivial assumptions (We will call TYPE_TRIVIAL_ASSUMPTION). They usually follow signs:
+# - They assign the mathematical objects of variables.
+
+# # 3.Question:  Does this problem have non-trivial redundant assumption?
+
+# # 4.To answer the question, you must follow the format below:
+# ###BEGIN_OF_FORMAT###
+# Answer: <yes/no> 
+
+# Ordinal number of redundant assumption: 
+# <If the problem has a non-trivial redundant assumption, write the ordinal number of redundant assumption, which is the same as the ordinal number of assumption in the problem. If the problem does not have a non-trivial redundant assumption, write -1> 
+
+# Redundant assumption: 
+# <If the problem has a non-trivial redundant assumption, write the non-trivial redundant assumption here, write the same as assumption the problem has. If the problem does not have a non-trivial redundant assumption, write "no"> 
+
+# Your explanation: 
+# <if you suppose the problem has at least one non-trivial redundant assumption, you should choose one of the following method to prove that chosen assumption are non-trivial redundant:
+# 1. Logical analysis: Try to prove the theorem without using one of the premises. If the proof still works, that premise was non-trivial redundant.
+# 2. Counterexample testing: If removing a premise would genuinely weaken the theorem, you should be able to find a counterexample where all remaining premises hold but the conclusion fails. If you can't find such a counterexample, the premise might be non-trivial redundant.
+# 3. Minimal premise systems: mathematicians often seek minimal sets of non-trivial redundant premises—removing any non-trivial redundant premise that can be derived from others.
+# >
+# ###END_OF_FORMAT###
+
+# """
+# Prompt for create a redundant assumption
+###########################################################################################################################
+# You are competive professor in the field of mathematics. You are given a problem and a solution (the proof) for that problem. You need to figure out the important results to prove the proposition step by step in the solution (or the proof) and then take out randomly 1 result from the list of important results.
+# You need to output the result in the following format:
+# IMPORTANT_RESULT: ###START_OF_RESULT### <result> ###END_OF_RESULT###
 # Model name mappings (API model IDs)
 GEMINI_MODELS = {
     "gemini-2.5-flash": "gemini-2.5-flash",
     "gemini-2.5-pro": "gemini-2.5-pro",
-    "gemini-3.0-flash": "gemini-3.0-flash",
-    "gemini-3.0-pro": "gemini-3.0-pro",
+    "gemini-3.0-pro-preview": "gemini-3.0-pro-preview",
+    # "gemini-3.0-flash-preview": "gemini-3.0-flash-preview",
 }
 
 DEEPSEEK_MODELS = {
     "deepseek-chat": "deepseek-chat",
     "deepseek-reasoner": "deepseek-reasoner",
 }
+
+def preprocess_text(text: str) -> str:
+    """
+    Preprocess the text to remove the extra spaces and newlines.
+    """
+    text = text.strip()
+    # text = text.replace("\\\\( ", "$")
+    # text = text.replace("\\\\(", "$")
+    # text = text.replace(" \\\\)", "$")
+    # text = text.replace("\\\\)", "$")
+
+    # text = text.replace("\\\\[ ", "$$\\n")
+    # text = text.replace("\\\\[", "$$\\n")
+    # text = text.replace("\\\\[\\n", "$$\\n")
+
+    # text = text.replace(" \\\\]", "\\n$$")
+    # text = text.replace("\\\\]", "\\n$$")
+    # text = text.replace("\\n\\\\]", "\\n$$")
+
+    text = text.replace("\\( ", "$")
+    text = text.replace("\\(", "$")
+    text = text.replace(" \\)", "$")
+    text = text.replace("\\)", "$")
+
+    text = text.replace("\\[ ", "$$\\n")
+    text = text.replace("\\[", "$$\\n")
+    text = text.replace("\\[\\n", "$$\\n")
+
+    text = text.replace(" \\]", "\\n$$")
+    text = text.replace("\\]", "\\n$$")
+    text = text.replace("\\n\\]", "\\n$$")
+    return text
+
+def output_format_as_json_object(text: str, keys: List[str]) -> dict:
+    """
+    Output the text in the format of a JSON object.
+    """
+    dictionary = {
+        "Answer": r"Answer:\s*([\s\S]*?)\s*(?=Ordinal number of redundant assumption:)",
+        "Ordinal number of redundant assumption": r"Ordinal number of redundant assumption:\s*([\s\S]*?)\s*(?=Redundant assumption:)",
+        "Redundant assumption": r"Redundant assumption:\s*([\s\S]*?)\s*(?=Your explanation:)",
+        "Your explanation": r"Your explanation:\s*([\s\S]*?)(?=###END_OF_FORMAT###|$)"
+    }
+    
+    answer = {}
+    for key in keys:
+        match = re.search(dictionary[key], text)
+        if match:
+            answer[key] = match.group(1).strip()
+        else:
+            print(f"Warning: Could not find pattern for key '{key}'")
+            answer[key] = None
+    
+    return answer
 
 
 def get_model_name(llm_name: str, thinking_mode: bool) -> str:
@@ -138,7 +285,8 @@ def initialize_llm(llm_name: str, thinking_mode: bool, **kwargs) -> Any:
                 default_params["thinking_budget"] = -1 if thinking_mode else 256
             elif llm_name.startswith("gemini-3.0"):
                 # Gemini 3.0 uses thinking_level
-                default_params["thinking_level"] = "high" if thinking_mode else "low"
+                if thinking_mode: 
+                    default_params["thinking_level"] = "high"
 
         return ChatGoogleGenerativeAI(model=model_name, **default_params)
     elif llm_name in DEEPSEEK_MODELS:
@@ -225,13 +373,14 @@ def main():
     parser.add_argument(
         "--prompt_column2",
         type=str,
-        required=True,
+        default="",
+        required=False,
         help="Name of the column containing the prompt"
     )
     parser.add_argument(
         "--response_column",
         type=str,
-        required=True,
+        required=False,
         help="Name of the column containing the response"
     )
     parser.add_argument(
@@ -293,7 +442,7 @@ def main():
     )
     
     parser.add_argument(
-        "--max-retries",
+        "--max_retries",
         type=int,
         default=2,
         help="Maximum retries (default: 2)"
@@ -301,11 +450,7 @@ def main():
     
     args = parser.parse_args()
     save_path = args.save_path
-    system_message = """
-    You are competive professor in the field of mathematics. You are given a problem and a solution (the proof) for that problem. You need to figure out the important results to prove the proposition step by step in the solution (or the proof) and then take out randomly 1 result from the list of important results.
-    You need to output the result in the following format:
-    IMPORTANT_RESULT: ###START_OF_RESULT### <result> ###END_OF_RESULT###
-    """
+    system_message = SYSTEM_MESSAGE
     data = load_data(args.data_path)  
     llm_kwargs = {
         "temperature": args.temperature,
@@ -314,10 +459,11 @@ def main():
         "max_retries": args.max_retries,
     }
     for index, row in data.iterrows():
-        if index < args.id_from or index > args.id_to:
+        if index < args.id_from or index >= args.id_to:
             continue
         else:
-            prompt = row[args.prompt_column1] + "\n" + row[args.prompt_column2]
+            # Note that you should modify prompt upto the task
+            prompt = row[args.prompt_column1]
             # Call appropriate function based on mode
             if args.mode == "thinking":
                 response = call_llm_with_thinking_mode(
@@ -339,11 +485,33 @@ def main():
             else:
                 os.mkdir(Path(save_path))
             # Save respond to the result_task_{index}.json
-            with open(f"{save_path}/result_task_{(4 - len(str(index))) * '0' + str(index)}.json", "w", encoding="utf-8") as f:
+            print(response,file=open("response.txt", "a"))
+            response = preprocess_text(response)
+            answer = output_format_as_json_object(response, ["Answer", "Ordinal number of redundant assumption", "Redundant assumption", "Your explanation"])
+            with open(f"{save_path}/{args.llm}_{args.mode}_result_task_{(4 - len(str(index))) * '0' + str(index)}.json", "w", encoding="utf-8") as f:
                 json.dump({
-                    "prompt": prompt,
-                    "system_message": system_message,
-                    "Important_Result": response,
+                   'Link_API': row['Link_API'], 
+                   'Title': row['Title'], 
+                   'Score': row['Score'], 
+                   'Category': row['Category'], 
+                   'Tags': row['Tags'], 
+                   'Link': row['Link'], 
+                   'Content': row['Content'],
+                   'AcceptedAnswer': row['AcceptedAnswer'], 
+                   'llm_answer_create_structured_problem': row['llm_answer_create_structured_problem'], 
+                   'reasoning_create_structured_problem': row['reasoning_create_structured_problem'], 
+                   'Proof_problem': row['Proof_problem'],
+                   'Original_Problem': row['Original_Problem'], 
+                   'Original_Problem_with_numerical_assumption': row['Original_Problem_with_numerical_assumption'], 
+                   'Number_of_Assumption': row['Number_of_Assumption'], 
+                   'Groundtruth_redundant_assumption': row['Groundtruth_redundant_assumption'], 
+                   'Groundtruth_redundant_assumption_number': row['Groundtruth_redundant_assumption_number'], 
+                   'Problem_with_redundant_assumption': row['Problem_with_redundant_assumption'],
+                   "System_message and Prompt": system_message + "\n\n" + prompt,
+                   'llm_answer_yesno_redundant_assumption': answer['Answer'],
+                   'llm_ordinal_number_of_redundant_assumption': answer['Ordinal number of redundant assumption'],
+                   'llm_redundant_assumption': answer['Redundant assumption'],
+                   'llm_explanation': answer['Your explanation']
                 }, f, ensure_ascii=False, indent=4)
     
     

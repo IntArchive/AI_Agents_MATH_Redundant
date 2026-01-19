@@ -52,7 +52,7 @@ def evaluation_metrics_for_PROBLEM_WITH_RA(data):
     yesno_list = []
     detect_list = []
     review_list = []
-    for a, b, proof_review in zip(data['Groundtruth_redundant_assumption_number'], data['redundant_assumption_number'], data['proof_review']):
+    for a, b, proof_review in zip(data['Groundtruth_redundant_assumption_number'], data['llm_answer_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
         if pd.isna(b):
             yesno_list.append(0)
             detect_list.append(0)

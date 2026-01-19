@@ -3,23 +3,27 @@
 COMMAND_TO_RUN = \
 """
 python ./utils/eval_whole.py \
---TP 76 \
---FN 4 \
---FP 49 \
---TN 31 \
---TPreviewFalse 22 \
---FPreviewTrue 33
+--TP 195 \
+--FN 5 \
+--FP 99 \
+--TN 101 \
+--TPreviewFalse 0 \
+--FPreviewTrue 0
 """
 
 def evaluate_whole(TP, FN, FP, TN, TPreviewTrue, TPreviewFalse, FPreviewTrue, FPreviewFalse):
     accuracy = (TP + TN) / (TP + TN + FP + FN)
     precision = TP / (TP + FP)
     recall = TP / (TP + FN)
+    far = FP / (FP + TN)
+    tnr = TN / (TN + FP)
     false_alarm_rate_rv = FPreviewTrue / (FPreviewTrue + FPreviewFalse)
     TNR_rv = FPreviewFalse / (FPreviewTrue + FPreviewFalse)
     return {"accuracy": accuracy, \
            "precision": precision, \
            "recall": recall, \
+           "far": far, \
+           "tnr": tnr, \
            "false_alarm_rate_rv": false_alarm_rate_rv, \
            "false_alarm_rate_ra": TNR_rv}
 
