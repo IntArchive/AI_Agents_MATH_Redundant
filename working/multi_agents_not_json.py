@@ -31,6 +31,7 @@ import re
 import json
 import argparse
 
+
 def preprocess_text_after_regex(text: str) -> str:
     text = text.strip()
     return text
@@ -106,12 +107,14 @@ def extract_json_obj(text: str) -> dict:
     return json.loads(json_str)
 
 
+
+
 # ---------- agent factory ----------
 def build_agent(
     llm: Union[ChatDeepSeek, ChatOpenAI],
     name: str,
     goal: str,
-    guidelines: str,
+        guidelines: str,
     tools: list,
 ) -> tuple[AgentExecutor, str]:
     """create a tool-calling agent with a role-specific system prompt."""
@@ -190,6 +193,7 @@ class MultiAgentSystem:
                     redundant_assumption = parser.get("Redundant assumption")
                     assumptions = parser.get("Assumptions")
                     ordinal_number_of_redundant_assumption = parser.get("Ordinal number of redundant assumption")
+
                     if answer_to_Q1 is None or answer_to_Q1.strip() == "":
                         raise ValueError("Answer to Q1 is None or empty")
                     elif redundant_assumption is None or redundant_assumption.strip() == "":
@@ -209,20 +213,23 @@ class MultiAgentSystem:
                 elif role.name == "proof strategy planner":
                     parser = output_format_as_json_object(output, ["proof sketch"])
                     proof_sketch = parser.get("proof sketch")
+
                     if proof_sketch is None or proof_sketch.strip() == "":
                         raise ValueError("Proof sketch is None or empty")
+
                     print("proof_sketch: ", proof_sketch)
                     
                     parser["running_input"] = running_input
                     parser["output"] = output
                     parser["role"] = role.name
                     parser["round"] = round_idx
-                        
+
                 elif role.name == "mathematician and proof writer":
                     parser = output_format_as_json_object(output, ["detailed proof"])
                     detailed_proof = parser.get("detailed proof")
                     if detailed_proof is None or detailed_proof.strip() == "":
                         raise ValueError("Detailed proof is None or empty")
+
                     print("detailed_proof: ", detailed_proof)
                         
                 elif role.name == "final reviewer":
@@ -236,6 +243,7 @@ class MultiAgentSystem:
                         raise ValueError("Finished is None or empty")
                     if clear_answer is None or clear_answer.strip() == "":
                         raise ValueError("Clear answer is None or empty")
+
                     print("proof_review: ", proof_review)
                     print("finished: ", finished)
                     print("clear_answer: ", clear_answer)
@@ -270,12 +278,14 @@ class MultiAgentSystem:
                         "llm_answer_predicted_redundant_assumption": redundant_assumption,
                         "llm_answer_proof_review": proof_review,
                         "llm_answer_clear_answer": clear_answer,
+
                     }
                 )
 
                 for line in output.splitlines():
                     if finished.strip().lower() == "yes" and clear_answer.strip().lower() == "yes":
                         running_input_log.insert(0, {"user": user_task})
+
                         process["__transcript__"] = self.transcript
                         process["__running_log__"] = running_input_log
                         return process 
@@ -323,6 +333,7 @@ def parse_args():
         help='Task to solve'
     )
     parser.add_argument(
+
         '--target_problem_col',
         type=str,
         required=True,
@@ -402,6 +413,7 @@ def main():
         max_retries=2,
     )
 
+
     # Build agents with system prompts
     judge_executor, judge_system = build_agent(
         llm=llm_deepseek_chat,
@@ -462,6 +474,7 @@ def main():
     )
 
     reviewer_executor, reviewer_system = build_agent(
+
         llm=llm_deepseek_reasoner,
         name="final reviewer",
         goal="""
@@ -550,6 +563,7 @@ def main():
         data.at[i, "llm_answer_ordinal_number_of_redundant_assumption"] = running_log[-1].get("llm_answer_ordinal_number_of_redundant_assumption", "10000") if running_log else "10000"
         data.at[i, "llm_answer_proof_review"] = running_log[-1].get("llm_answer_proof_review", "") if running_log else ""
         data.at[i, "llm_answer_clear_answer"] = running_log[-1].get("llm_answer_clear_answer", "") if running_log else ""
+
         
         # Save results
         row_json = data.iloc[i].to_json(force_ascii=False, indent=4)
