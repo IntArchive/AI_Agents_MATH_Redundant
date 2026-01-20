@@ -40,14 +40,14 @@ def output_format_as_json_object(text: str, keys: List[str]) -> dict:
     """
     dictionary = {
         "Answer": r"Answer:\s*([\s\S]*?)\s*(?=Ordinal number of redundant assumption:)",
-        "Ordinal number of redundant assumption": r"Ordinal number of redundant assumption:\s*([\s\S]*?)\s*(?=###END_OF_FORMAT###)",
+        "Ordinal number of redundant assumption": r"Ordinal number of redundant assumption:\s*([\s\S]*?)\s*(?=###END_OF_FORMAT_PART1###)",
         "Redundant assumption": r"Redundant assumption:\s*([\s\S]*?)\s*(?=Your explanation:)",
         "Your explanation": r"Your explanation:\s*([\s\S]*?)(?=###END_OF_FORMAT###|$)",
         "Answer to Q1": r"Answer to Q1:\s*([\s\S]*?)\s*(?=Redundant assumption:)",
         "Redundant assumption": r"Redundant assumption:\s*([\s\S]*?)\s*(?=Assumptions:)",
         "Assumptions": r"Assumptions:\s*([\s\S]*?)\s*(?=Ordinal number of redundant assumption:)",
         "proof sketch": r"proof sketch:\s*([\s\S]*?)\s*(?=end_of_proof_sketch)",
-        "detailed proof": r"detailed proof:\s*([\s\S]*?)\s*(?=end_of_detailed_proof)",
+        "detailed proof": r"detailed proof:\s*([\s\S]*?)\s*(?=###END_OF_FORMAT_PART3###)",
         "proof review": r"proof review:\s*([\s\S]*?)\s*(?=finished:)",
         "finished": r"finished:\s*([\s\S]*?)\s*(?=clear answer:)",
         "clear answer": r"clear answer:\s*([\s\S]*?)\s*(?=end_of_proof_review)",
@@ -164,10 +164,11 @@ class MultiAgentSystem:
         clear_answer: str = "yes"
         running_input_log: list[dict[str, Any]] = []
         new_problem: str = ""
-        proof_sketch: str = ""
         detailed_proof: str = ""
         ordinal_number_of_redundant_assumption: Union[str, int] = "10000"
         proof_review: str = ""
+        answer_to_Q1: str = ""
+        redundant_assumption: str = ""
 
         for round_idx in range(1, self.max_rounds + 1):
             for role in self.roles:
@@ -204,21 +205,11 @@ class MultiAgentSystem:
                         new_problem = "The problem does not have a redundant assumption. You must write down 'no'"
                         print("new_problem: ", new_problem)
                             
-                elif role.name == "proof strategy planner":
-                    parser = output_format_as_json_object(output, ["proof sketch"])
-                    proof_sketch = parser.get("proof sketch")
-
-                    if proof_sketch is None or proof_sketch.strip() == "":
-                        raise ValueError("Proof sketch is None or empty")
-
-                    print("proof_sketch: ", proof_sketch)
                     
                     parser["running_input"] = running_input
                     parser["output"] = output
                     parser["role"] = role.name
                     parser["round"] = round_idx
-
-                elif role.name == "mathematician and proof writer":
                     parser = output_format_as_json_object(output, ["detailed proof"])
                     detailed_proof = parser.get("detailed proof")
                     if detailed_proof is None or detailed_proof.strip() == "":
@@ -247,10 +238,6 @@ class MultiAgentSystem:
                 full_context = role.system_prompt + "\n" + running_input
 
                 if role.name == "judge":
-                    running_input = "The new problem is \n" + new_problem
-                elif role.name == "proof strategy planner":
-                    running_input = "The new problem is \n" + new_problem + "\n" "Proof sketch is \n" + proof_sketch
-                elif role.name == "mathematician and proof writer":
                     running_input = "The new problem is \n" + new_problem + "\n" "Detailed proof is \n" + detailed_proof
                 elif role.name == "final reviewer":
                     # Use reasoning_content from deepseek-reasoner as feedback if available, otherwise use proof_review
@@ -260,21 +247,26 @@ class MultiAgentSystem:
 
                 
                 
-                running_input_log.append(
-                    {
+                log_entry = {
                         "round": round_idx,
                         "role": role.name,
                         "output": output,
                         "running_input": running_input,
                         "system_prompt_" + role.name: full_context,
-                        "llm_answer_yesno_redundant_assumption": answer_to_Q1,
-                        "llm_answer_ordinal_number_of_redundant_assumption": ordinal_number_of_redundant_assumption,  
-                        "llm_answer_predicted_redundant_assumption": redundant_assumption,
-                        "llm_answer_proof_review": proof_review,
-                        "llm_answer_clear_answer": clear_answer,
-
                     }
-                )
+                
+                # Add judge-specific fields only when role is judge
+                if role.name == "judge":
+                    log_entry["llm_answer_yesno_redundant_assumption"] = answer_to_Q1
+                    log_entry["llm_answer_ordinal_number_of_redundant_assumption"] = ordinal_number_of_redundant_assumption
+                    log_entry["llm_answer_predicted_redundant_assumption"] = redundant_assumption
+                
+                # Add reviewer-specific fields only when role is final reviewer
+                if role.name == "final reviewer":
+                    log_entry["llm_answer_proof_review"] = proof_review
+                    log_entry["llm_answer_clear_answer"] = clear_answer
+                
+                running_input_log.append(log_entry)
 
                 for line in output.splitlines():
                     if finished.strip().lower() == "yes" and clear_answer.strip().lower() == "yes":
@@ -447,7 +439,7 @@ def main():
     ###END_OF_FORMAT_PART2###
     Now we have the new problem. Your task is to prove the new problem.
     ####BEGIN_OF_FORMAT_PART3###
-    Proof:
+    detailed proof:
     <You need to prove the new problem. You need to prove that you can deduce redundant assumption from the others redundant assumption>
 
     ###END_OF_FORMAT_PART3###
@@ -514,6 +506,34 @@ def main():
             print("Here -------------")
             redundant_assumption = final_answer.split("Redundant Assumption:")[-1].strip()
             data.at[i, "Redundant_assumption"] = redundant_assumption
+        
+        # Extract additional fields from running log
+        running_log = final_answer.get("__running_log__", [])
+        judge_log_entry = None
+        # Get the last (most recent) judge log entry
+        for log_entry in reversed(running_log):
+            if isinstance(log_entry, dict) and log_entry.get("role") == "judge":
+                judge_log_entry = log_entry
+                break
+        
+        if judge_log_entry:
+            # Extract System_message and Prompt
+            system_message_prompt = judge_log_entry.get("system_prompt_judge", "")
+            data.at[i, "System_message and Prompt"] = system_message_prompt
+            
+            # Extract LLM answers
+            data.at[i, "llm_answer_yesno_redundant_assumption"] = judge_log_entry.get("llm_answer_yesno_redundant_assumption", "")
+            data.at[i, "llm_ordinal_number_of_redundant_assumption"] = judge_log_entry.get("llm_answer_ordinal_number_of_redundant_assumption", "")
+            data.at[i, "llm_redundant_assumption"] = judge_log_entry.get("llm_answer_predicted_redundant_assumption", "")
+            data.at[i, "llm_explanation"] = judge_log_entry.get("llm_explanation", "")
+        else:
+            # Set default values if judge log entry not found
+            data.at[i, "System_message and Prompt"] = ""
+            data.at[i, "llm_answer_yesno_redundant_assumption"] = ""
+            data.at[i, "llm_ordinal_number_of_redundant_assumption"] = ""
+            data.at[i, "llm_redundant_assumption"] = ""
+            data.at[i, "llm_explanation"] = ""
+        
         # Save the current row as JSON for inspection
         row_json = data.iloc[i].to_json(force_ascii=False, indent=4)
 
