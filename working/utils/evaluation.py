@@ -104,12 +104,12 @@ def binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA(
 def evaluation_metrics_for_PROBLEM_WITHOUT_RA(data):
     yesno_list = []
     review_list = []
-    for b, proof_review in zip(data['redundant_assumption_number'], data['proof_review']):
-        if pd.isna(b):
+    for yes_no, ordinal_number, proof_review in zip(data['llm_answer_yesno_redundant_assumption'], data['llm_answer_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
+        if "yes" in str(yes_no).lower() and "no" not in str(yes_no).lower():
             yesno_list.append(1)
         else:
             yesno_list.append(0)
-            review_list.append(0 if proof_review else 1)
+            review_list.append(0 if bool(proof_review) else 1)
 
     return binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA([1]*len(yesno_list), yesno_list), binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA([1]*len(review_list), review_list)
 

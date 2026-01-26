@@ -133,7 +133,7 @@ class TestEvaluationMetricsForProblemWithRA:
         data = pd.DataFrame({
             "llm_answer_yesno_redundant_assumption": ["yes", "yes", "yes"],
             "Groundtruth_redundant_assumption_number": [1, 2, 3],
-            "llm_ordinal_number_of_redundant_assumption": [1, 2, 3]
+            "llm_answer_ordinal_number_of_redundant_assumption": [1, 2, 3]
         })
         
         yesno_metrics, detect_metrics = evaluation_metrics_for_PROBLEM_WITH_RA(data)
@@ -163,7 +163,7 @@ class TestEvaluationMetricsForProblemWithRA:
         data = pd.DataFrame({
             "llm_answer_yesno_redundant_assumption": ["yes", "no", "yes", "no"],
             "Groundtruth_redundant_assumption_number": [1, 2, 3, 4],
-            "llm_ordinal_number_of_redundant_assumption": [1, 2, 4, 4]
+            "llm_answer_ordinal_number_of_redundant_assumption": [1, 2, 4, 4]
         })
         
         yesno_metrics, detect_metrics = evaluation_metrics_for_PROBLEM_WITH_RA(data)
@@ -178,7 +178,7 @@ class TestEvaluationMetricsForProblemWithRA:
         data = pd.DataFrame({
             "llm_answer_yesno_redundant_assumption": [],
             "Groundtruth_redundant_assumption_number": [],
-            "llm_ordinal_number_of_redundant_assumption": []
+            "llm_answer_ordinal_number_of_redundant_assumption": []
         })
         
         yesno_metrics, detect_metrics = evaluation_metrics_for_PROBLEM_WITH_RA(data)
@@ -292,7 +292,7 @@ class TestEdgeCases:
         data = pd.DataFrame({
             "llm_answer_yesno_redundant_assumption": ["yes", "no", np.nan],
             "Groundtruth_redundant_assumption_number": [1, 2, 3],
-            "llm_ordinal_number_of_redundant_assumption": [1, 2, 3]
+            "llm_answer_ordinal_number_of_redundant_assumption": [1, 2, 3]
         })
         
         # This might raise an error or handle NaN - test the actual behavior
@@ -310,7 +310,7 @@ class TestEdgeCases:
         data = pd.DataFrame({
             "llm_answer_yesno_redundant_assumption": ["yes"] * (n // 2) + ["no"] * (n // 2),
             "Groundtruth_redundant_assumption_number": list(range(1, n + 1)),
-            "llm_ordinal_number_of_redundant_assumption": list(range(1, n + 1))
+            "llm_answer_ordinal_number_of_redundant_assumption": list(range(1, n + 1))
         })
         
         yesno_metrics, detect_metrics = evaluation_metrics_for_PROBLEM_WITH_RA(data)
