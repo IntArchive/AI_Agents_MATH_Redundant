@@ -371,6 +371,7 @@ def parse_args():
 def main():
     # Parse command line arguments
     args = parse_args()
+    config = setup.setup()
     # Load data
     data = load_data(args.file_path)
     data["judge"] = ""
@@ -392,6 +393,25 @@ def main():
         timeout=None,
         max_retries=2,
     )
+
+
+    llm_gemini = ChatGoogleGenerativeAI(
+        model="gemini-2.5-flash",
+        temperature=0,
+        max_tokens=None,
+        timeout=None,
+        max_retries=2,
+        # other params...
+    )
+
+    llm_gemini_2 = ChatGoogleGenerativeAI( 
+        model="gemini-2.5-pro", 
+        temperature=0,
+        max_tokens=None,
+        timeout=None,
+        max_retries=2,
+        # other params...
+    )
     
     # DeepSeek Reasoner model for complex reasoning tasks
     llm_deepseek_reasoner = ChatDeepSeek(
@@ -405,7 +425,7 @@ def main():
 
     # Build agents with system prompts
     judge_executor, judge_system = build_agent(
-        llm=llm_deepseek_chat,
+        llm=llm_gemini, 
         name="judge",
         goal="""
     Read a structured mathematics problem and write answers carefully and concisely.
@@ -427,7 +447,7 @@ def main():
     )
 
     planner_executor, planner_system = build_agent(
-        llm=llm_deepseek_chat,
+        llm=llm_gemini, 
         name="proof strategy planner",
         goal="""
     Read a structured mathematics problem and write answers carefully and concisely follow the JSON structure or JSON object as mentioned in guidelines.
@@ -448,7 +468,7 @@ def main():
     )
 
     mathematician_executor, mathematician_system = build_agent(
-        llm=llm_deepseek_chat,
+        llm=llm_gemini, 
         name="mathematician and proof writer",
         goal="""Read the new problem and the proof sketch and write a detailed proof for those subgoals in proof sketch.
         Your answer should be in the following format:
