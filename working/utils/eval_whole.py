@@ -3,11 +3,11 @@
 COMMAND_TO_RUN = \
 """
 python ./utils/eval_whole.py \
---TP 200 \
---FN 0 \
+--TP 113 \
+--FN 87 \
 --FP 135 \
---TN 65 \
---TPreviewFalse 87 \
+--TN 0 \
+--TPreviewFalse 0 \
 --FPreviewTrue 0
 """
 

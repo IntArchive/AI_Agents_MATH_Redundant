@@ -8,13 +8,35 @@ from sklearn.metrics import confusion_matrix
 
 COMMAND_TO_RUN = \
 """
-python ./utils/evaluation.py \
---data_path "./data/test_for_WITH_RA.xlsx" \
---evaluation_for_problem "Problem_with_redundant_assumption"
+python utils/evaluation.py \
+--file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_deepseek-chat.xlsx" \
+--file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_deepseek-chat.xlsx" \
+--task "classification"
 
-python ./utils/evaluation.py \
---data_path "./data/test_for_WITHOUT_RA.xlsx" \
---evaluation_for_problem "Original_Problem_with_numerical_assumption"
+python utils/evaluation.py --file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_deepseek-chat.xlsx" --file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_deepseek-chat.xlsx" --task "detection"
+
+python utils/evaluation.py \
+--file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_gemini-25-flash.xlsx" \
+--file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_gemini-25-flash.xlsx" \
+--task "detection"
+
+
+python utils/evaluation.py \
+--file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_deepseek-reasoner.xlsx" \
+--file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_deepseek-reasoner.xlsx" \
+--task "detection"
+
+
+python utils/evaluation.py \
+--file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_Qwen3-Next-80B-A3B-Instruct.xlsx" \
+--file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_Qwen3-Next-80B-A3B-Instruct.xlsx" \
+--task "detection"
+
+
+python utils/evaluation.py \
+--file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_Pipeline1.xlsx" \
+--file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_Pipeline1.xlsx" \
+--task "detection"
 """
 
 def binary_classification_metrics_FOR_PROBLEM_WITH_RA(
@@ -52,7 +74,7 @@ def evaluation_metrics_for_PROBLEM_WITH_RA(data):
     yesno_list = []
     detect_list = []
     review_list = []
-    for a, b, proof_review in zip(data['Groundtruth_redundant_assumption_number'], data['llm_answer_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
+    for a, b, proof_review in zip(data['Groundtruth_redundant_assumption_number'], data['llm_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
         if pd.isna(b):
             yesno_list.append(0)
             detect_list.append(0)
@@ -104,7 +126,7 @@ def binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA(
 def evaluation_metrics_for_PROBLEM_WITHOUT_RA(data):
     yesno_list = []
     review_list = []
-    for yes_no, ordinal_number, proof_review in zip(data['llm_answer_yesno_redundant_assumption'], data['llm_answer_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
+    for yes_no, ordinal_number, proof_review in zip(data['llm_answer_yesno_redundant_assumption'], data['llm_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
         if "yes" in str(yes_no).lower() and "no" not in str(yes_no).lower():
             yesno_list.append(1)
         else:
@@ -113,56 +135,43 @@ def evaluation_metrics_for_PROBLEM_WITHOUT_RA(data):
 
     return binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA([1]*len(yesno_list), yesno_list), binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA([1]*len(review_list), review_list)
 
+
+
+
 if __name__ == "__main__":
     import argparse
+    from evaluation_ver2 import RedundantHypothesisEvaluator
     parser = argparse.ArgumentParser()
-    parser.add_argument("--data_path", type=str, default="")
-    parser.add_argument(
-        "--evaluation_for_problem",
-        type=str,
-        default="Problem_with_redundant_assumption",
-        choices=[
-            "Problem_with_redundant_assumption",
-            "Original_Problem_with_numerical_assumption"
-        ],
-        help="Choose which evaluation type to use: Problem_with_redundant_assumption or Original_Problem_with_numerical_assumption"
-    )
+    parser.add_argument("--file_benchmark_on_datawithredundantassumption", type=str, default="")
+    parser.add_argument("--file_benchmark_on_datawithoutredundantassumption", type=str, default="")
+    parser.add_argument("--task", type=str, default="classification", choices=["classification", "detection"])
 
     args = parser.parse_args()
-    data = pd.read_excel(args.data_path)
-    if args.evaluation_for_problem == "Problem_with_redundant_assumption":
-        print("Evaluate for the whole dataset on Problem with redundant assumption")
-        evaluation_metrics, evaluation_metrics_reviews = evaluation_metrics_for_PROBLEM_WITH_RA(data)
-        print_evaluation_metrics(evaluation_metrics)
-        print("==================END_FOR_WHOLE_DATASET=================")
-        print("\n")
-        print("Evaluate for the predicted positive dataset")
-        data_predicted_positive = data[data["redundant_assumption_number"].notna()]
-        evaluation_metrics, evaluation_metrics_review = evaluation_metrics_for_PROBLEM_WITH_RA(data_predicted_positive)
-        print("\n")
-        print("The following will print the truely predicted problem with redundant assumption (TP)")
-        print("Then calculate the TP_withREVIEW_TRUE and TP_withREVIEW_FALSE")
-        print(f"TP_withREVIEW_TRUE = {evaluation_metrics_review["TP"]}")
-        print(f"TP_withREVIEW_FALSE = {evaluation_metrics_review["FN"]}")
-        print("==================END_FOR_PREDICTED_POSITIVE_DATASET=================")
-    elif args.evaluation_for_problem == "Original_Problem_with_numerical_assumption":
-        print("Evaluate for the whole dataset on Problem without redundant assumption")
-        evaluation_metrics, evaluation_metrics_review = evaluation_metrics_for_PROBLEM_WITHOUT_RA(data)
-        print_evaluation_metrics(evaluation_metrics)
-        print("==================END_FOR_WHOLE_DATASET=================")
+    data_with_redundant_assumption = pd.read_excel(args.file_benchmark_on_datawithredundantassumption)
+    print(data_with_redundant_assumption.describe())
+    data_without_redundant_assumption = pd.read_excel(args.file_benchmark_on_datawithoutredundantassumption)
+    print(data_without_redundant_assumption.describe())
+    if args.task == "detection":
+        evaluator = RedundantHypothesisEvaluator()
+        # coverage_score = coverage_metrics(data_with_redundant_assumption, data_without_redundant_assumption)
+        for gt, pred, num_hypotheses in zip(data_with_redundant_assumption['Groundtruth_redundant_assumption_number'], data_with_redundant_assumption['llm_ordinal_number_of_redundant_assumption'], data_with_redundant_assumption['Number_of_Assumption']):
+            evaluator.add_prediction(gt_label=str(gt), pred_label=str(pred), num_hypotheses=num_hypotheses + 1)
         
-        print("\n")
-
-        print("Evaluate for negative proof review true/false")
-        data_predicted_positive = data[data["redundant_assumption_number"].notna()]
-        evaluation_metrics, evaluation_metrics_review = evaluation_metrics_for_PROBLEM_WITHOUT_RA(data_predicted_positive)
+        ct = 0
+        for gt, pred, num_hypotheses in zip([str(-1)]*len(data_without_redundant_assumption), data_without_redundant_assumption['llm_ordinal_number_of_redundant_assumption'], data_without_redundant_assumption['Number_of_Assumption']):
+            evaluator.add_prediction(gt_label='NONE', pred_label='NONE' if str(pred) == '-1' else str(pred), num_hypotheses=num_hypotheses)
+        evaluator.compute_metrics()
+        evaluator.print_report()
+    elif args.task == "classification":
+        print("Evaluate for the whole dataset on Problem with redundant assumption")
+        evaluation_metrics, evaluation_metrics_reviews = evaluation_metrics_for_PROBLEM_WITH_RA(data_with_redundant_assumption)
         print_evaluation_metrics(evaluation_metrics)
+        print("==================END_FOR_WHOLE_DATASET=================")
         print("\n")
-        print("The following will print the wrongly predicted problem without redundant assumption (FP)")
-        print("Then calculate the FP_withREVIEW_TRUE and FP_withREVIEW_FALSE")
-        print(f"FP_withREVIEW_FALSE = {evaluation_metrics_review["TN"]}")
-        print(f"FP_withREVIEW_TRUE = {evaluation_metrics_review["FP"]}")
-        print("==================END_FOR_PREDICTED_POSITIVE_DATASET=================")
+        print("Evaluate for the whole dataset on Problem without redundant assumption")
+        evaluation_metrics, evaluation_metrics_review = evaluation_metrics_for_PROBLEM_WITHOUT_RA(data_without_redundant_assumption)
+        print_evaluation_metrics(evaluation_metrics)
+        print("==================END_FOR_WHOLE_DATASET=================")
     else:
-        raise ValueError(f"Invalid evaluation type: {args.evaluation_for_problem}")
+        raise ValueError(f"Invalid task: {args.task}")
     
