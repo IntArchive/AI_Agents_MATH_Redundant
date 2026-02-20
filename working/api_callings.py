@@ -7,6 +7,7 @@ import os
 from typing import Optional, List, Dict, Any
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_deepseek import ChatDeepSeek
+from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage
 from utils import setup
 from utils.dataloader import load_data
@@ -140,13 +141,17 @@ Your explanation:
 GEMINI_MODELS = {
     "gemini-2.5-flash": "gemini-2.5-flash",
     "gemini-2.5-pro": "gemini-2.5-pro",
-    "gemini-3.0-pro-preview": "gemini-3.0-pro-preview",
+    "gemini-3-pro-preview": "gemini-3-pro-preview",
     # "gemini-3.0-flash-preview": "gemini-3.0-flash-preview",
 }
 
 DEEPSEEK_MODELS = {
     "deepseek-chat": "deepseek-chat",
     "deepseek-reasoner": "deepseek-reasoner",
+}
+OPENAI_MODELS = {
+    "gpt-5.2": "gpt-5.2",
+    "gpt-5-mini": "gpt-5-mini"
 }
 
 def preprocess_text(text: str) -> str:
@@ -227,6 +232,10 @@ def get_model_name(llm_name: str, thinking_mode: bool) -> str:
             return DEEPSEEK_MODELS["deepseek-reasoner"]
         else:
             return DEEPSEEK_MODELS["deepseek-chat"]
+    elif llm_name in OPENAI_MODELS:
+        # OpenAI models currently do not expose a native "thinking mode";
+        # we route both modes to the same chat model.
+        return OPENAI_MODELS[llm_name]
     else:
         raise ValueError(f"Unknown LLM: {llm_name}")
 
@@ -244,8 +253,8 @@ def initialize_llm(llm_name: str, thinking_mode: bool, **kwargs) -> Any:
         Initialized LLM instance
     """
     # Ensure API keys are loaded from config.yml via setup.py.
-    # This populates DEEPSEEK_API_KEY and GOOGLE_API_KEY from working/config.yml.
-    if not os.environ.get("DEEPSEEK_API_KEY") or not os.environ.get("GOOGLE_API_KEY"):
+    # This populates DEEPSEEK_API_KEY, GOOGLE_API_KEY, OPENAI_API_KEY, etc. from working/config.yml.
+    if not os.environ.get("DEEPSEEK_API_KEY") or not os.environ.get("GOOGLE_API_KEY") or not os.environ.get("OPENAI_API_KEY"):
         try:
             setup.setup()
         except Exception:
@@ -283,7 +292,7 @@ def initialize_llm(llm_name: str, thinking_mode: bool, **kwargs) -> Any:
                 # - thinking_mode=True  -> dynamic / higher budget (-1)
                 # - thinking_mode=False -> small but non-zero budget (cannot fully disable)
                 default_params["thinking_budget"] = -1 if thinking_mode else 256
-            elif llm_name.startswith("gemini-3.0"):
+            elif llm_name.startswith("gemini-3"):
                 # Gemini 3.0 uses thinking_level
                 if thinking_mode: 
                     default_params["thinking_level"] = "high"
@@ -291,6 +300,9 @@ def initialize_llm(llm_name: str, thinking_mode: bool, **kwargs) -> Any:
         return ChatGoogleGenerativeAI(model=model_name, **default_params)
     elif llm_name in DEEPSEEK_MODELS:
         return ChatDeepSeek(model=model_name, **default_params)
+    elif llm_name in OPENAI_MODELS:
+        default_params["reasoning"] = {"effort": "medium"} 
+        return ChatOpenAI(model=model_name, **default_params)
     else:
         raise ValueError(f"Unknown LLM: {llm_name}")
 
@@ -406,8 +418,8 @@ def main():
         "--llm",
         type=str,
         required=True,
-        choices=list(GEMINI_MODELS.keys()) + list(DEEPSEEK_MODELS.keys()),
-        help="LLM to use (e.g., gemini-2.5-flash, deepseek-chat)"
+        choices=list(GEMINI_MODELS.keys()) + list(DEEPSEEK_MODELS.keys()) + list(OPENAI_MODELS.keys()),
+        help="LLM to use (e.g., gemini-2.5-flash, deepseek-chat, gpt-4.1)"
     )
     
     # Mode selection
@@ -484,7 +496,15 @@ def main():
                 pass
             else:
                 os.mkdir(Path(save_path))
+            print(response)
+            if args.llm in OPENAI_MODELS:
+                response = response[1]['text']
+            elif args.llm in GEMINI_MODELS and args.mode == "thinking":
+                response = response[0]["text"]
+            else:
+                response = response
             # Save respond to the result_task_{index}.json
+
             response = preprocess_text(response)
             answer = output_format_as_json_object(response, ["Answer", "Ordinal number of redundant assumption", "Redundant assumption", "Your explanation"])
             with open(f"{save_path}/{args.llm}_{args.mode}_result_task_{(4 - len(str(index))) * '0' + str(index)}.json", "w", encoding="utf-8") as f:

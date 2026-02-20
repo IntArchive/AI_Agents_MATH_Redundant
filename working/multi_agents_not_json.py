@@ -6,6 +6,7 @@ from pathlib import Path
 import os
 from dataclasses import dataclass
 from openai import OpenAI
+from openai.lib import streaming
 import pandas as pd
 
 from langchain_openai import ChatOpenAI
@@ -38,9 +39,10 @@ def output_format_as_json_object(text: str, keys: List[str]) -> dict:
     """
     Output the text in the format of a JSON object.
     """
+    text = text + "###END_OF_FORMAT###"
     dictionary = {
         "Answer": r"Answer:\s*([\s\S]*?)\s*(?=Ordinal number of redundant assumption:)",
-        "Ordinal number of redundant assumption": r"Ordinal number of redundant assumption:\s*([\s\S]*?)\s*(?=###END_OF_FORMAT###)",
+        "Ordinal number of redundant assumption": r"Ordinal number of redundant assumption:\s*([\s\S]*?)\s*(?=###END_OF_FORMAT###)|Ordinal number of redundant assumption:\s*([\s\S]*?)\s",
         "Redundant assumption": r"Redundant assumption:\s*([\s\S]*?)\s*(?=Your explanation:)",
         "Your explanation": r"Your explanation:\s*([\s\S]*?)(?=###END_OF_FORMAT###|$)",
         "Answer to Q1": r"Answer to Q1:\s*([\s\S]*?)\s*(?=Redundant assumption:)",
@@ -56,6 +58,9 @@ def output_format_as_json_object(text: str, keys: List[str]) -> dict:
     answer = {}
     for key in keys:
         match = re.search(dictionary[key], text)
+        print("vvvvvvvvvvvvvvvvvvvvvvvvvvvvv")
+        print("text is ", text)
+        print("^^^^^^^^^^^^^^^^^^^^^^^")
         if match:
             answer[key] = match.group(1).strip()
         else:
@@ -184,7 +189,9 @@ class MultiAgentSystem:
                     redundant_assumption = parser.get("Redundant assumption")
                     assumptions = parser.get("Assumptions")
                     ordinal_number_of_redundant_assumption = parser.get("Ordinal number of redundant assumption")
-
+                    print("vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv")
+                    print("The output is ", output)
+                    print("^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^")
                     if answer_to_Q1 is None or answer_to_Q1.strip() == "":
                         raise ValueError("Answer to Q1 is None or empty")
                     elif redundant_assumption is None or redundant_assumption.strip() == "":
@@ -355,7 +362,7 @@ def parse_args():
     parser.add_argument(
         '--max_rounds',
         type=int,
-        default=2,
+        default=1,
         help='Maximum number of rounds for the multi-agent system'
     )
     parser.add_argument(
@@ -399,8 +406,9 @@ def main():
         model="gemini-2.5-flash",
         temperature=0,
         max_tokens=None,
-        timeout=None,
+        timeout=200,
         max_retries=2,
+        streaming=False,
         # other params...
     )
 

@@ -37,6 +37,11 @@ python utils/evaluation.py \
 --file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_Pipeline1.xlsx" \
 --file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_Pipeline1.xlsx" \
 --task "detection"
+
+python utils/evaluation.py \
+--file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_gpt-5-mini.xlsx" \
+--file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_gpt-5-mini.xlsx" \
+--task "detection"
 """
 
 def binary_classification_metrics_FOR_PROBLEM_WITH_RA(
