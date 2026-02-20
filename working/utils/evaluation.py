@@ -9,8 +9,8 @@ from sklearn.metrics import confusion_matrix
 COMMAND_TO_RUN = \
 """
 python utils/evaluation.py \
---file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_deepseek-chat.xlsx" \
---file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_deepseek-chat.xlsx" \
+--file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_Pipeline1.xlsx" \
+--file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_Pipeline1.xlsx" \
 --task "classification"
 
 python utils/evaluation.py --file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_deepseek-chat.xlsx" --file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_deepseek-chat.xlsx" --task "detection"
@@ -42,6 +42,11 @@ python utils/evaluation.py \
 --file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_gpt-5-mini.xlsx" \
 --file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_gpt-5-mini.xlsx" \
 --task "detection"
+
+python utils/evaluation.py \
+--file_benchmark_on_datawithredundantassumption "data/Task1_PRWITHRA_Pipeline2_deepseek-chat_and_deepseek-reasoner.xlsx" \
+--file_benchmark_on_datawithoutredundantassumption "data/Task2_PRWITHOUTRA_Pipeline2_deepseek-chat_and_deepseek-reasoner.xlsx" \
+--task "detection"
 """
 
 def binary_classification_metrics_FOR_PROBLEM_WITH_RA(
@@ -71,27 +76,45 @@ def binary_classification_metrics_FOR_PROBLEM_WITH_RA(
     return {
         "TP": tp,
         "FN": fn,
+        "TN": tn,
+        "FP": fp,
     }
 
 # We need to filter the problem which review as false and true
 
 def evaluation_metrics_for_PROBLEM_WITH_RA(data):
+    i = 0
     yesno_list = []
     detect_list = []
     review_list = []
     for a, b, proof_review in zip(data['Groundtruth_redundant_assumption_number'], data['llm_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
+        
+        try:
+            if not isinstance(a, int):
+                a = int(a)
+            if not isinstance(b, int):
+                b = int(b)
+            if not isinstance(proof_review, bool):
+                proof_review = bool(proof_review)
+        except:
+            # print(a, b, proof_review)
+            print(f"Error at index {i}")
+            continue
+        # print(type(a), type(b), type(proof_review))
         if pd.isna(b):
             yesno_list.append(0)
             detect_list.append(0)
-        elif a == b:
+        elif a == b or str(a) in str(b):
             yesno_list.append(1)
             detect_list.append(1)
             review_list.append(1 if proof_review else 0)
         else:
+            # print(type(a), type(b), proof_review)
+            print(f"Error at index {i}", a, b, proof_review)
             yesno_list.append(1)
             detect_list.append(0)
             review_list.append(0 if proof_review else 1)
-
+        i += 1
     return binary_classification_metrics_FOR_PROBLEM_WITH_RA([1]*len(yesno_list), yesno_list), binary_classification_metrics_FOR_PROBLEM_WITH_RA([1]*len(review_list), review_list)
 
 
@@ -123,21 +146,27 @@ def binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA(
         y_true, y_pred, labels=[0, 1], normalize=None
     ).ravel()
 
+    print(tn, fp, fn, tp)
     return {
-        "TN": tp,
-        "FP": fn,
+        "TP": tp,
+        "FN": fn,
+        "TN": tn,
+        "FP": fp,
     }
 
 def evaluation_metrics_for_PROBLEM_WITHOUT_RA(data):
     yesno_list = []
     review_list = []
+    i = 0
     for yes_no, ordinal_number, proof_review in zip(data['llm_answer_yesno_redundant_assumption'], data['llm_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
-        if "yes" in str(yes_no).lower() and "no" not in str(yes_no).lower():
-            yesno_list.append(1)
-        else:
+        if "yes" in str(yes_no).lower():
+            print(f"Error at index {i}", yes_no, ordinal_number, proof_review)
             yesno_list.append(0)
             review_list.append(0 if bool(proof_review) else 1)
-
+        else:
+            yesno_list.append(1)
+            # review_list.append(1 if bool(proof_review) else 0)
+        i += 1
     return binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA([1]*len(yesno_list), yesno_list), binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA([1]*len(review_list), review_list)
 
 
@@ -153,9 +182,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     data_with_redundant_assumption = pd.read_excel(args.file_benchmark_on_datawithredundantassumption)
-    print(data_with_redundant_assumption.describe())
+    # print(data_with_redundant_assumption.describe())
     data_without_redundant_assumption = pd.read_excel(args.file_benchmark_on_datawithoutredundantassumption)
-    print(data_without_redundant_assumption.describe())
+    # print(data_without_redundant_assumption.describe())
     if args.task == "detection":
         evaluator = RedundantHypothesisEvaluator()
         # coverage_score = coverage_metrics(data_with_redundant_assumption, data_without_redundant_assumption)
@@ -171,11 +200,15 @@ if __name__ == "__main__":
         print("Evaluate for the whole dataset on Problem with redundant assumption")
         evaluation_metrics, evaluation_metrics_reviews = evaluation_metrics_for_PROBLEM_WITH_RA(data_with_redundant_assumption)
         print_evaluation_metrics(evaluation_metrics)
+        print("Evaluation metrics for reviews:")
+        print_evaluation_metrics(evaluation_metrics_reviews)
         print("==================END_FOR_WHOLE_DATASET=================")
         print("\n")
         print("Evaluate for the whole dataset on Problem without redundant assumption")
         evaluation_metrics, evaluation_metrics_review = evaluation_metrics_for_PROBLEM_WITHOUT_RA(data_without_redundant_assumption)
         print_evaluation_metrics(evaluation_metrics)
+        print("Evaluation metrics for reviews:")
+        print_evaluation_metrics(evaluation_metrics_review)
         print("==================END_FOR_WHOLE_DATASET=================")
     else:
         raise ValueError(f"Invalid task: {args.task}")
