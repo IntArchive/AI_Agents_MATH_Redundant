@@ -7,6 +7,7 @@ import os
 
 from dataclasses import dataclass
 from openai import OpenAI
+from openai.lib import streaming
 import pandas as pd
 
 from langchain_openai import ChatOpenAI
@@ -38,6 +39,7 @@ def output_format_as_json_object(text: str, keys: List[str]) -> dict:
     """
     Output the text in the format of a JSON object.
     """
+    text = text + "###END_OF_FORMAT###"
     dictionary = {
         "Answer": r"Answer:\s*([\s\S]*?)\s*(?=Ordinal number of redundant assumption:)",
         "Ordinal number of redundant assumption": r"Ordinal number of redundant assumption:\s*([\s\S]*?)\s*(?=###END_OF_FORMAT_PART1###)",
@@ -147,7 +149,7 @@ class MultiAgentSystem:
     - feeds the latest transcript to each agent in turn.
     - stops when any agent outputs a line starting with 'final:'.
     """
-    def __init__(self, roles: list[role], max_rounds: int = 6):
+    def __init__(self, roles: list[role], max_rounds: int = 1):
         self.roles = roles
         self.max_rounds = max_rounds
         self.transcript: list[dict[str, any]] = []
@@ -238,10 +240,17 @@ class MultiAgentSystem:
                 full_context = role.system_prompt + "\n" + running_input
 
                 if role.name == "judge":
-                    running_input = "The new problem is \n" + new_problem + "\n" "Detailed proof is \n" + detailed_proof
+                    if "no" in answer_to_Q1.strip().lower():
+                        running_input = full_context + "\n Answer of the first agent 'judge' is" + output
+                    else:
+                        running_input = "The new problem is \n" + new_problem + "\n" "Detailed proof is \n" + detailed_proof
+                    print("VVVVVVVVV")
+                    print(running_input)
+                    print("^^^^^^^^^^^^")
                 elif role.name == "final reviewer":
                     # Use reasoning_content from deepseek-reasoner as feedback if available, otherwise use proof_review
                     running_input = user_task + "\n" + "Proof review is \n" + output
+                    
 
                 self.transcript.append({"speaker": role.name, "text": output})
 
@@ -258,7 +267,7 @@ class MultiAgentSystem:
                 # Add judge-specific fields only when role is judge
                 if role.name == "judge":
                     log_entry["llm_answer_yesno_redundant_assumption"] = answer_to_Q1
-                    log_entry["llm_answer_ordinal_number_of_redundant_assumption"] = ordinal_number_of_redundant_assumption
+                    log_entry["llm_ordinal_number_of_redundant_assumption"] = ordinal_number_of_redundant_assumption
                     log_entry["llm_answer_predicted_redundant_assumption"] = redundant_assumption
                 
                 # Add reviewer-specific fields only when role is final reviewer
@@ -374,14 +383,15 @@ def main():
     problem_column = load_problem_column(args.file_path, args.target_problem_col)
     
 
-    # llm_deepseek = ChatDeepSeek(
-    #     model="deepseek-chat",
-    #     temperature=0,
-    #     max_tokens=None,
-    #     timeout=None,
-    #     max_retries=2,
-    #     # other params...
-    #     )
+    llm_deepseek = ChatDeepSeek(
+        model="deepseek-chat",
+        temperature=0,
+        max_tokens=None,
+        timeout=None,
+        max_retries=2,
+        streaming=False
+        # other params...
+        )
     
     llm_gemini = ChatGoogleGenerativeAI(
         model="gemini-2.5-flash",
@@ -389,6 +399,7 @@ def main():
         max_tokens=None,
         timeout=None,
         max_retries=2,
+        streaming=False
         # other params...
     )
 
@@ -399,12 +410,13 @@ def main():
         max_tokens=None,
         timeout=None,
         max_retries=2,
+        streaming=False
     )
 
     # define three agents with different responsibilities
     # 3. Add parser instructions to your guidelines or prompt
     judge, judge_system = build_agent(
-        llm=llm_gemini,
+        llm=llm_deepseek,
         name="judge",
         goal="""
     Read a structured mathematics problem. 
@@ -450,6 +462,7 @@ def main():
         llm=llm_deepseek_reasoner,
         name="final reviewer",
         goal="""
+        You will read the process another agent detect whether a mathematical proof problem has a redundant assumption $A_i$, identify that redundancy and try to justify the redundancy by proving the redundant assumption is true only by using the other assumption (without using redundant assumption).
         Check correctness of the proof; you should output the answer in the following format:
         ###BEGIN_OF_FORMAT###
         answer_proof_review:
@@ -510,7 +523,12 @@ def main():
             if isinstance(log_entry, dict) and log_entry.get("role") == "judge":
                 judge_log_entry = log_entry
                 break
-        
+
+        reviewer_log_entry = None
+        for log_entry in reversed(running_log):
+            if isinstance(log_entry, dict) and log_entry.get("role") == "final reviewer":
+                reviewer_log_entry = log_entry
+                break
         if judge_log_entry:
             # Extract System_message and Prompt
             # Build per-role context
@@ -530,12 +548,18 @@ def main():
             data.at[i, "final reviewer"] = role_contexts.get("final reviewer", "")
             system_message_prompt = judge_log_entry.get("system_prompt_judge", "")
             data.at[i, "System_message and Prompt"] = system_message_prompt
-            
+            data.at[i, "system_prompt_judge"] = judge_log_entry.get("system_prompt_judge", "")
             # Extract LLM answers
             data.at[i, "llm_answer_yesno_redundant_assumption"] = judge_log_entry.get("llm_answer_yesno_redundant_assumption", "")
-            data.at[i, "llm_ordinal_number_of_redundant_assumption"] = judge_log_entry.get("llm_answer_ordinal_number_of_redundant_assumption", "")
+            data.at[i, "llm_ordinal_number_of_redundant_assumption"] = judge_log_entry.get("llm_ordinal_number_of_redundant_assumption", "")
             data.at[i, "llm_redundant_assumption"] = judge_log_entry.get("llm_answer_predicted_redundant_assumption", "")
-            data.at[i, "llm_explanation"] = judge_log_entry.get("llm_explanation", "")
+            data.at[i, "llm_judge_explanation"] = judge_log_entry.get("output", "")
+            data.at[i, "llm_answer_predicted_redundant_assumption"] = judge_log_entry.get("llm_answer_predicted_redundant_assumption", "")
+            data.at[i, "llm_ordinal_number_of_redundant_assumption"] = judge_log_entry.get("llm_ordinal_number_of_redundant_assumption", "")
+            data.at[i, "llm_answer_proof_review"] = running_log[-1].get("llm_answer_proof_review", "")
+            data.at[i, "llm_answer_clear_answer"] = running_log[-1].get("llm_answer_clear_answer", "")
+        elif reviewer_log_entry:
+            data.at[i, "system_prompt_final reviewer"] = reviewer_log_entry.get("system_prompt_final reviewer", "")
         else:
             data.at[i, "judge"] = ""
             data.at[i, "final reviewer"] = ""
@@ -557,6 +581,9 @@ def main():
         else:
             os.mkdir(Path(save_path))
         task_id_str = f"{(4 - len(str(i))) * '0' + str(i)}"
+        with open(Path(f"{save_path}/judge_log_entry_reviewer_log_entry_{task_id_str}.json"), "w", encoding="utf-8") as f_json:
+            f_json.write(json.dumps([judge_log_entry, reviewer_log_entry], ensure_ascii=False, indent=4))
+
         with open(Path(f"{save_path}/result_task_{task_id_str}.json"), "w", encoding="utf-8") as f_json:
             f_json.write(row_json)
 
