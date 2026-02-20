@@ -319,12 +319,6 @@ def parse_args():
         help='Task to solve'
     )
     parser.add_argument(
-        '--filename',
-        type=str,
-        required=True,
-        help='Filename for the results'
-    )
-    parser.add_argument(
 
         '--target_problem_col',
         type=str,
@@ -356,7 +350,7 @@ def parse_args():
     parser.add_argument(
         '--max_rounds',
         type=int,
-        default=2,
+        default=1,
         help='Maximum number of rounds for the multi-agent system'
     )
     parser.add_argument(
@@ -440,7 +434,7 @@ def main():
     Now we have the new problem. Your task is to prove the new problem.
     ####BEGIN_OF_FORMAT_PART3###
     detailed proof:
-    <You need to prove the new problem. You need to prove that you can deduce redundant assumption from the others redundant assumption>
+    <You need to prove the new problem. You need to prove that you can deduce redundant assumption from the others redundant assumption. If there is not a new problem you must write down "We don't have a new problem so we don't have a detailed proof>
 
     ###END_OF_FORMAT_PART3###
     """,
@@ -500,6 +494,7 @@ def main():
                 continue
         print(f"\n\n=========================== TASK {i} ===================================\n")
         final_answer = system.run(problem)
+        conversation = final_answer.get("__transcript__", [])
         data.at[i, "judge"] = final_answer.get("judge", "")
         data.at[i, "final reviewer"] = final_answer.get("final reviewer", "")
         if "Redundant Assumption:" in final_answer:
@@ -518,6 +513,21 @@ def main():
         
         if judge_log_entry:
             # Extract System_message and Prompt
+            # Build per-role context
+            role_names = [
+                "judge",
+                "final reviewer",
+            ]
+            role_contexts = {
+                role_name: "\n\n".join(
+                    entry.get("running_input", "")
+                    for entry in running_log
+                    if entry.get("role") == role_name
+                )
+                for role_name in role_names
+            }
+            data.at[i, "judge"] = role_contexts.get("judge", "")
+            data.at[i, "final reviewer"] = role_contexts.get("final reviewer", "")
             system_message_prompt = judge_log_entry.get("system_prompt_judge", "")
             data.at[i, "System_message and Prompt"] = system_message_prompt
             
@@ -527,6 +537,8 @@ def main():
             data.at[i, "llm_redundant_assumption"] = judge_log_entry.get("llm_answer_predicted_redundant_assumption", "")
             data.at[i, "llm_explanation"] = judge_log_entry.get("llm_explanation", "")
         else:
+            data.at[i, "judge"] = ""
+            data.at[i, "final reviewer"] = ""
             # Set default values if judge log entry not found
             data.at[i, "System_message and Prompt"] = ""
             data.at[i, "llm_answer_yesno_redundant_assumption"] = ""
@@ -544,9 +556,26 @@ def main():
             pass
         else:
             os.mkdir(Path(save_path))
-        with open(Path(f"{save_path}/{args.filename}result_task_{i}.json"), "w", encoding="utf-8") as f_json:
+        task_id_str = f"{(4 - len(str(i))) * '0' + str(i)}"
+        with open(Path(f"{save_path}/result_task_{task_id_str}.json"), "w", encoding="utf-8") as f_json:
             f_json.write(row_json)
 
+        # Save per-task conversation log
+        with open(f"{save_path}/conversation_task_{task_id_str}.json", "w", encoding="utf-8") as f_conv:
+            json.dump(
+                {
+                    "task_index": i,
+                    "task": task,
+                    "transcript": conversation,
+                    "running_log": running_log,
+                    "role_contexts": role_contexts,
+                },
+                f_conv,
+                ensure_ascii=False,
+                indent=4,
+            )
+    
+    print(f"\n\nProcessing complete! Results saved to: {args.save_path}")
 
 
 if __name__ == "__main__":
