@@ -88,7 +88,7 @@ def evaluation_metrics_for_PROBLEM_WITH_RA(data):
     detect_list = []
     review_list = []
     for a, b, proof_review in zip(data['Groundtruth_redundant_assumption_number'], data['llm_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
-        
+        i += 1
         try:
             if not isinstance(a, int):
                 a = int(a)
@@ -97,10 +97,10 @@ def evaluation_metrics_for_PROBLEM_WITH_RA(data):
             if not isinstance(proof_review, bool):
                 proof_review = bool(proof_review)
         except:
-            # print(a, b, proof_review)
-            print(f"Error at index {i}")
-            continue
-        # print(type(a), type(b), type(proof_review))
+            print("<<<<<<<<<<<<<<<<<Shit ", i)
+            print(a, b, proof_review)
+            
+            
         if pd.isna(b):
             yesno_list.append(0)
             detect_list.append(0)
@@ -108,13 +108,14 @@ def evaluation_metrics_for_PROBLEM_WITH_RA(data):
             yesno_list.append(1)
             detect_list.append(1)
             review_list.append(1 if proof_review else 0)
+            print("proof_review is ", proof_review)
         else:
             # print(type(a), type(b), proof_review)
-            print(f"Error at index {i}", a, b, proof_review)
             yesno_list.append(1)
             detect_list.append(0)
             review_list.append(0 if proof_review else 1)
-        i += 1
+
+        
     return binary_classification_metrics_FOR_PROBLEM_WITH_RA([1]*len(yesno_list), yesno_list), binary_classification_metrics_FOR_PROBLEM_WITH_RA([1]*len(review_list), review_list)
 
 
@@ -160,12 +161,12 @@ def evaluation_metrics_for_PROBLEM_WITHOUT_RA(data):
     i = 0
     for yes_no, ordinal_number, proof_review in zip(data['llm_answer_yesno_redundant_assumption'], data['llm_ordinal_number_of_redundant_assumption'], data['llm_answer_proof_review']):
         if "yes" in str(yes_no).lower():
-            print(f"Error at index {i}", yes_no, ordinal_number, proof_review)
             yesno_list.append(0)
             review_list.append(0 if bool(proof_review) else 1)
         else:
+            
             yesno_list.append(1)
-            # review_list.append(1 if bool(proof_review) else 0)
+            review_list.append(1 if bool(proof_review) else 0)
         i += 1
     return binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA([1]*len(yesno_list), yesno_list), binary_classification_metrics_FOR_PROBLEM_WITHOUT_RA([1]*len(review_list), review_list)
 
@@ -173,6 +174,7 @@ def evaluation_metrics_for_PROBLEM_WITHOUT_RA(data):
 
 
 if __name__ == "__main__":
+    i = 0
     import argparse
     from evaluation_ver2 import RedundantHypothesisEvaluator
     parser = argparse.ArgumentParser()
@@ -182,9 +184,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     data_with_redundant_assumption = pd.read_excel(args.file_benchmark_on_datawithredundantassumption)
-    # print(data_with_redundant_assumption.describe())
     data_without_redundant_assumption = pd.read_excel(args.file_benchmark_on_datawithoutredundantassumption)
-    # print(data_without_redundant_assumption.describe())
     if args.task == "detection":
         evaluator = RedundantHypothesisEvaluator()
         # coverage_score = coverage_metrics(data_with_redundant_assumption, data_without_redundant_assumption)

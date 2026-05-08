@@ -23,6 +23,7 @@ dependencies = [
     "pandas>=2.3.2",
     "pandas-ods-reader>=1.0.2",
     "scikit-learn>=1.8.0",
+    "wordcloud>=1.9.6",
 ]
 
 [dependency-groups]

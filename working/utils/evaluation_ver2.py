@@ -24,7 +24,8 @@ class RedundantHypothesisEvaluator:
         n = len(self.results)
         
         # 1. Exact Match Accuracy
-        # Exact Match Accuracy is easy to understand and usually misunderstood as the dectection accuracy. But they are not the same because the detection accuracy is 
+        # Exact Match Accuracy is easy to understand and usually misunderstood as the dectection accuracy. But they are not the same because the detection accuracy is
+        
         exact_match = sum(1 for r in self.results if r['gt'] == r['pred'])
         exact_match_acc = exact_match / n
         
