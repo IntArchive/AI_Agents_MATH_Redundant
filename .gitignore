@@ -1,8 +1,6 @@
 # Python-generated files
 .DS_Store
 __pycache__/
-working/asset/
-working/test.ipynb
 *.py[oc]
 build/
 dist/
@@ -20,13 +18,14 @@ working/data/.~*
 
 
 # privacy
-config.yml
 
 # temporary files
-working/temp.ipynb
 *.swp
 
 # Folder data
+working/temp.ipynb
+config.yml
+working/test.ipynb
 working/data/
 working/data/temporary/
 working/data/donedataset/
